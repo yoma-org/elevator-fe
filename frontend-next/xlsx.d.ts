@@ -1,3 +1,1 @@
-declare module "xlsx" {
-  export * from "xlsx/types";
-}
+declare module "xlsx";
