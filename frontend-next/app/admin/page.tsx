@@ -133,16 +133,21 @@ function AnimatedNumber({ target }: { target: number }) {
 
 // ─── StatCard ──────────────────────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, unit, ok }: { icon: string; label: string; value: string | number; unit?: string; ok?: boolean; }) {
+function StatCard({ icon, label, value, unit, ok, active, onClick }: { icon: string; label: string; value: string | number; unit?: string; ok?: boolean; active?: boolean; onClick?: () => void; }) {
   const isNum = typeof value === "number";
+  const clickable = !!onClick;
   return (
-    <div className="flex-1 bg-white rounded-lg px-5 py-4 border border-gray-200 min-w-0 card-hover" style={{ animation: "slideUp .3s ease both" }}>
+    <div
+      className={`flex-1 bg-white rounded-lg px-5 py-4 min-w-0 card-hover ${clickable ? "cursor-pointer" : ""}`}
+      style={{ animation: "slideUp .3s ease both", boxShadow: active ? "0 0 0 2px rgba(22,163,74,.4)" : undefined }}
+      onClick={onClick}
+    >
       <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
         <span>{icon}</span>
-        <span className="font-semibold uppercase tracking-wide">{label}</span>
+        <span className={`font-semibold uppercase tracking-wide ${active ? "text-green-700" : ""}`}>{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-3xl font-bold text-gray-800">
+        <span className={`text-3xl font-bold ${active ? "text-green-700" : "text-gray-800"}`}>
           {isNum ? <AnimatedNumber target={value as number} /> : value}
         </span>
         {unit && <span className="text-sm font-semibold text-gray-500 uppercase ml-1">{unit}</span>}
@@ -538,6 +543,7 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [statsFilter, setStatsFilter] = useState<"myQueue" | "projectsThisMonth" | "activeJobs" | null>(null);
 
   function addToast(text: string, kind: "success" | "error" = "success") {
     const id = ++toastId.current;
@@ -552,12 +558,19 @@ export default function AdminDashboard() {
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
       if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
-      const [ordersRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`),
-        fetch(`${API_BASE}/maintenance-reports/admin/stats`),
-      ]);
-      setOrders(await ordersRes.json());
-      setStats(await statsRes.json());
+      const ordersRes = await fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`);
+      const ordersData: WorkOrder[] = await ordersRes.json();
+      setOrders(ordersData);
+
+      // Compute stats from list data so numbers always match
+      const now = new Date();
+      const myQueue = ordersData.filter(o => o.status !== "invoice-ready" && o.status !== "cancelled").length;
+      const projectsThisMonth = ordersData.filter(o => {
+        const d = new Date(o.arrivalDateTime);
+        return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+      }).length;
+      const activeJobs = ordersData.filter(o => o.status === "active" || o.status === "in-progress").length;
+      setStats({ myQueue, projectsThisMonth, activeJobs, avgResponseTimeMin: 45, avgWorkDurationHrs: 2.3 });
     } catch (e) {
       console.error(e);
     } finally {
@@ -565,9 +578,21 @@ export default function AdminDashboard() {
     }
   }, [fromDate, toDate, statusFilter]);
 
-  useEffect(() => { setCurrentPage(1); void fetchData(); }, [fetchData]);
+  useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
 
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const filteredByStats = statsFilter
+    ? orders.filter((o) => {
+        if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "cancelled";
+        if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
+        if (statsFilter === "projectsThisMonth") {
+          const now = new Date();
+          const d = new Date(o.arrivalDateTime);
+          return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+        }
+        return true;
+      })
+    : orders;
+  const sortedOrders = [...filteredByStats].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -652,17 +677,26 @@ export default function AdminDashboard() {
 
       {/* Stats row */}
       <div className="flex gap-3 mb-4 flex-wrap">
-        <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} />
-        <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} />
-        <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} />
+        <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} active={statsFilter === "myQueue"} onClick={() => { setStatsFilter(f => f === "myQueue" ? null : "myQueue"); setCurrentPage(1); }} />
+        <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} active={statsFilter === "projectsThisMonth"} onClick={() => { setStatsFilter(f => f === "projectsThisMonth" ? null : "projectsThisMonth"); setCurrentPage(1); }} />
+        <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} active={statsFilter === "activeJobs"} onClick={() => { setStatsFilter(f => f === "activeJobs" ? null : "activeJobs"); setCurrentPage(1); }} />
         <StatCard icon="🕐" label="Avg Response Time"   value={stats?.avgResponseTimeMin ?? 45} unit="MIN" ok={true} />
         <StatCard icon="⏱" label="Avg Work Duration"   value={stats?.avgWorkDurationHrs ?? 2.3} unit="HRS" ok={true} />
       </div>
 
       {/* Work orders header */}
       <div className="rounded-t-lg px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "#1a3a2a" }}>
-        <h2 className="text-white font-bold text-sm uppercase tracking-widest">All Work Orders</h2>
-        {!loading && <span className="text-green-300 text-xs">{sortedOrders.length} records</span>}
+        <h2 className="text-white font-bold text-sm uppercase tracking-widest">
+          {statsFilter === "myQueue" ? "My Queue" : statsFilter === "projectsThisMonth" ? "Projects This Month" : statsFilter === "activeJobs" ? "Active Jobs" : "All Work Orders"}
+        </h2>
+        {!loading && (
+          <div className="flex items-center gap-2">
+            <span className="text-green-300 text-xs">{sortedOrders.length} records</span>
+            {statsFilter && (
+              <button onClick={() => { setStatsFilter(null); setCurrentPage(1); }} className="text-xs text-green-200 hover:text-white transition-colors underline">Clear filter</button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Work orders list */}

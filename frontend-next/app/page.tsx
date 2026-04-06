@@ -24,8 +24,8 @@ const API_BASE_URL =
 const stepTitles = [
   "Basic Information",
   "Service Checklist",
-  "Issues & Parts",
   "Photos & Notes",
+  "Issues & Parts",
   "Signatures",
   "Review & Submit",
 ];
@@ -33,8 +33,8 @@ const stepTitles = [
 const stepDescriptions = [
   "Enter service visit details",
   "Complete inspection items",
-  "Report any problems or replacements",
   "Attach evidence and notes",
+  "Report any problems or replacements",
   "Capture completion and signatures",
   "Please review all information before submitting",
 ];
@@ -1093,82 +1093,6 @@ export default function Home() {
 
           {step === 3 && (
             <div className="space-y-5">
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Any issues or abnormalities?
-                </label>
-                <textarea
-                  className="form-input min-h-[120px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
-                  placeholder="Describe any issues found during inspection..."
-                  value={formData.issuesFound}
-                  onChange={(event) => updateField("issuesFound", event.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="mb-3 block text-[15px] font-semibold text-slate-900">
-                  Did you replace any parts?
-                </label>
-                <div className="space-y-3">
-                  {["no", "yes"].map((choice) => (
-                    <button
-                      key={choice}
-                      type="button"
-                      onClick={() => updateField("partsReplaced", choice)}
-                      className={`flex w-full items-center rounded-lg border-2 p-4 text-left capitalize ${
-                        formData.partsReplaced === choice
-                          ? "border-[#f59e0b] bg-[hsl(35,80%,95%)]"
-                          : "border-slate-300 bg-white"
-                      }`}
-                    >
-                      <span className="text-[15px] font-medium">{choice}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {formData.partsReplaced === "yes" && (
-                <div className="space-y-3 rounded-lg border-2 border-slate-300 bg-slate-50 p-3">
-                  <p className="text-sm font-semibold text-slate-700">Parts</p>
-                  {formData.parts.map((part, index) => (
-                    <div key={`part-${index}`} className="grid grid-cols-5 gap-2">
-                      <input
-                        className="form-input col-span-3 h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
-                        placeholder="Part name"
-                        value={part.name}
-                        onChange={(event) => updatePart(index, "name", event.target.value)}
-                      />
-                      <input
-                        className="form-input col-span-1 h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
-                        type="number"
-                        min="1"
-                        value={part.quantity}
-                        onChange={(event) => updatePart(index, "quantity", event.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="col-span-1 h-11 rounded-lg bg-slate-200 text-sm font-semibold"
-                        onClick={() => removePart(index)}
-                        disabled={formData.parts.length === 1}
-                      >
-                        Del
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="h-10 rounded-lg bg-[#1b3c7b] px-4 text-sm font-semibold text-white"
-                    onClick={addPart}
-                  >
-                    Add Part
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-5">
               <div className="rounded-lg border-2 border-slate-300 bg-white p-3">
                 <label className="mb-2 block text-[15px] font-semibold text-slate-900">
                   Photos
@@ -1240,6 +1164,82 @@ export default function Home() {
                   onChange={(event) => updateField("customerMessage", event.target.value)}
                 />
               </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-5">
+              <div>
+                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
+                  Any issues or abnormalities?
+                </label>
+                <textarea
+                  className="form-input min-h-[120px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
+                  placeholder="Describe any issues found during inspection..."
+                  value={formData.issuesFound}
+                  onChange={(event) => updateField("issuesFound", event.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="mb-3 block text-[15px] font-semibold text-slate-900">
+                  Did you replace any parts?
+                </label>
+                <div className="space-y-3">
+                  {["no", "yes"].map((choice) => (
+                    <button
+                      key={choice}
+                      type="button"
+                      onClick={() => updateField("partsReplaced", choice)}
+                      className={`flex w-full items-center rounded-lg border-2 p-4 text-left capitalize ${
+                        formData.partsReplaced === choice
+                          ? "border-[#f59e0b] bg-[hsl(35,80%,95%)]"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      <span className="text-[15px] font-medium">{choice}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {formData.partsReplaced === "yes" && (
+                <div className="space-y-3 rounded-lg border-2 border-slate-300 bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-700">Parts</p>
+                  {formData.parts.map((part, index) => (
+                    <div key={`part-${index}`} className="grid grid-cols-5 gap-2">
+                      <input
+                        className="form-input col-span-3 h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
+                        placeholder="Part name"
+                        value={part.name}
+                        onChange={(event) => updatePart(index, "name", event.target.value)}
+                      />
+                      <input
+                        className="form-input col-span-1 h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
+                        type="number"
+                        min="1"
+                        value={part.quantity}
+                        onChange={(event) => updatePart(index, "quantity", event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="col-span-1 h-11 rounded-lg bg-slate-200 text-sm font-semibold"
+                        onClick={() => removePart(index)}
+                        disabled={formData.parts.length === 1}
+                      >
+                        Del
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="h-10 rounded-lg bg-[#1b3c7b] px-4 text-sm font-semibold text-white"
+                    onClick={addPart}
+                  >
+                    Add Part
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
