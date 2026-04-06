@@ -24,8 +24,8 @@ const API_BASE_URL =
 const stepTitles = [
   "Basic Information",
   "Service Checklist",
-  "Photos & Notes",
   "Issues & Parts",
+  "Photos & Notes",
   "Signatures",
   "Review & Submit",
 ];
@@ -33,8 +33,8 @@ const stepTitles = [
 const stepDescriptions = [
   "Enter service visit details",
   "Complete inspection items",
-  "Attach evidence and notes",
   "Report any problems or replacements",
+  "Attach evidence and notes",
   "Capture completion and signatures",
   "Please review all information before submitting",
 ];
@@ -1093,82 +1093,6 @@ export default function Home() {
 
           {step === 3 && (
             <div className="space-y-5">
-              <div className="rounded-lg border-2 border-slate-300 bg-white p-3">
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Photos
-                </label>
-                <label
-                  htmlFor="photo-upload"
-                  className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center hover:border-[#f59e0b] hover:bg-amber-50"
-                >
-                  <span className="text-sm font-semibold text-slate-700">Tap to upload photos</span>
-                  <span className="mt-1 text-xs text-slate-500">
-                    PNG, JPG, WEBP - up to {MAX_PHOTO_COUNT} images, max 5MB each
-                  </span>
-                </label>
-                <input
-                  id="photo-upload"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={onPhotoUpload}
-                  className="hidden"
-                />
-                <p className="mt-2 text-sm text-slate-600">Uploaded: {formData.photos.length}</p>
-                {formData.photos.length > 0 && (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {formData.photos.map((photo, idx) => (
-                      <figure key={`${photo.name}-${idx}`} className="relative overflow-hidden rounded-md border border-slate-300 bg-slate-50">
-                        <img
-                          src={photo.url}
-                          alt={photo.name}
-                          className="h-20 w-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removePhoto(idx)}
-                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-white"
-                          aria-label={`Remove ${photo.name}`}
-                        >
-                          x
-                        </button>
-                        <figcaption className="truncate px-1 py-1 text-[10px] text-slate-600" title={photo.name}>
-                          {photo.name}
-                        </figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Additional Notes
-                </label>
-                <textarea
-                  className="form-input min-h-[120px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
-                  placeholder="Any additional comments or observations..."
-                  value={formData.additionalNotes}
-                  onChange={(event) => updateField("additionalNotes", event.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Customer Message
-                </label>
-                <textarea
-                  className="form-input min-h-[90px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
-                  placeholder="Message to include in customer report..."
-                  value={formData.customerMessage}
-                  onChange={(event) => updateField("customerMessage", event.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-5">
               <div>
                 <label className="mb-2 block text-[15px] font-semibold text-slate-900">
                   Any issues or abnormalities?
@@ -1240,6 +1164,82 @@ export default function Home() {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-5">
+              <div className="rounded-lg border-2 border-slate-300 bg-white p-3">
+                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
+                  Photos
+                </label>
+                <label
+                  htmlFor="photo-upload"
+                  className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center hover:border-[#f59e0b] hover:bg-amber-50"
+                >
+                  <span className="text-sm font-semibold text-slate-700">Tap to upload photos</span>
+                  <span className="mt-1 text-xs text-slate-500">
+                    PNG, JPG, WEBP - up to {MAX_PHOTO_COUNT} images, max 5MB each
+                  </span>
+                </label>
+                <input
+                  id="photo-upload"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onPhotoUpload}
+                  className="hidden"
+                />
+                <p className="mt-2 text-sm text-slate-600">Uploaded: {formData.photos.length}</p>
+                {formData.photos.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {formData.photos.map((photo, idx) => (
+                      <figure key={`${photo.name}-${idx}`} className="relative overflow-hidden rounded-md border border-slate-300 bg-slate-50">
+                        <img
+                          src={photo.url}
+                          alt={photo.name}
+                          className="h-20 w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(idx)}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-white"
+                          aria-label={`Remove ${photo.name}`}
+                        >
+                          x
+                        </button>
+                        <figcaption className="truncate px-1 py-1 text-[10px] text-slate-600" title={photo.name}>
+                          {photo.name}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
+                  Additional Notes
+                </label>
+                <textarea
+                  className="form-input min-h-[120px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
+                  placeholder="Any additional comments or observations..."
+                  value={formData.additionalNotes}
+                  onChange={(event) => updateField("additionalNotes", event.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
+                  Customer Message
+                </label>
+                <textarea
+                  className="form-input min-h-[90px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
+                  placeholder="Message to include in customer report..."
+                  value={formData.customerMessage}
+                  onChange={(event) => updateField("customerMessage", event.target.value)}
+                />
+              </div>
             </div>
           )}
 
