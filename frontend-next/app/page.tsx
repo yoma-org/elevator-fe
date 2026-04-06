@@ -1612,9 +1612,9 @@ export default function Home() {
                   <p className="text-xs font-medium uppercase tracking-[0.2em] text-emerald-700">
                     Report Code
                   </p>
-                  <p className="mt-1 text-lg font-bold tracking-[0.15em] text-[#1b3c7b]">
+                  <a href="/admin" className="mt-1 block text-lg font-bold tracking-[0.15em] text-[#1b3c7b] underline hover:text-emerald-700 transition-colors">
                     {successReportCode}
-                  </p>
+                  </a>
                 </div>
               )}
               {successStatus && (

@@ -37,6 +37,7 @@ interface WorkOrder {
 }
 
 interface WorkOrderDetail extends WorkOrder {
+  buildingId: string; equipmentId: string;
   checklistResults: { equipmentType: string | null; checkedCount: number; totalCount: number;
     categories: Array<{ category: string; items: Array<{ label: string; checked: boolean }> }> } | null;
   remarks: string | null;
@@ -387,19 +388,63 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 // ─── DetailModal ───────────────────────────────────────────────────────────────
 
-function DetailModal({ code, onClose, onStatusChange, onToast }: {
+function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }: {
   code: string; onClose: () => void;
   onStatusChange: (code: string, status: string) => void;
   onToast: (msg: string, kind: "success" | "error") => void;
+  onDetailUpdated?: () => void;
 }) {
   const [detail, setDetail] = useState<WorkOrderDetail | null>(null);
   const [tab, setTab] = useState<"info" | "notes">("info");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
+  const [editEquipmentId, setEditEquipmentId] = useState("");
+
+  const editableStatuses = ["submitted", "pc-review", "comm-review", "pending", "completed", "commercial-review"];
+  const isEditable = detail ? editableStatuses.includes(detail.status) : false;
 
   useEffect(() => {
     setDetail(null);
+    setEditing(false);
     fetch(`${API_BASE}/maintenance-reports/admin/${code}`).then(r => r.json()).then(setDetail).catch(console.error);
   }, [code]);
+
+  function startEditing() {
+    if (!detail) return;
+    setEditEquipmentId(detail.equipmentId);
+    // Load equipment list for this building
+    fetch(`${API_BASE}/equipment/by-building?buildingId=${detail.buildingId}`)
+      .then(r => r.json())
+      .then(res => { const list = res?.data ?? res; setEquipmentList(Array.isArray(list) ? list : []); })
+      .catch(() => setEquipmentList([]));
+    setEditing(true);
+  }
+
+  const selectedEquipment = equipmentList.find(e => e.id === editEquipmentId);
+  const hasChanges = detail && editEquipmentId !== detail.equipmentId;
+
+  async function handleSaveEdit() {
+    if (!hasChanges) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ equipmentId: editEquipmentId }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      // Refresh detail from server
+      const updated = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`).then(r => r.json());
+      setDetail(updated);
+      setEditing(false);
+      onToast("Equipment updated successfully", "success");
+      onDetailUpdated?.();
+    } catch {
+      onToast("Failed to update details", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleStatusChange(status: string) {
     setSaving(true);
@@ -407,6 +452,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
       await fetch(`${API_BASE}/maintenance-reports/admin/${code}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
       onStatusChange(code, status);
       if (detail) setDetail({ ...detail, status });
+      setEditing(false);
       onToast(`Status updated to ${getStatusCfg(status).label}`, "success");
     } catch {
       onToast("Failed to update status", "error");
@@ -414,6 +460,8 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
       setSaving(false);
     }
   }
+
+  const editInputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-green-600 focus:ring-2 focus:ring-green-100 resize-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay-fade" style={{ backgroundColor: "rgba(0,0,0,0.45)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -474,14 +522,62 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
                 <InfoRow label="Response Time" value="45 minutes" />
                 <InfoRow label="Work Duration" value="2.3 hours" />
               </Section>
-              {detail.findings && <Section title="Issue Description"><p className="text-sm text-gray-700 leading-relaxed">{detail.findings}</p></Section>}
-              {detail.workPerformed && <Section title="Action Taken"><p className="text-sm text-gray-700 leading-relaxed">{detail.workPerformed}</p></Section>}
-              {detail.partsUsed && detail.partsUsed.length > 0 && (
+
+              {editing ? (
+                <>
+                  <Section title="Edit Equipment">
+                    <div className="space-y-3">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Original</p>
+                        <p className="text-sm text-gray-700">{detail.equipmentType} — {detail.equipmentCode}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Equipment (Lift No.) <span className="text-red-500">*</span></label>
+                        {equipmentList.length === 0 ? (
+                          <div className="skeleton h-10 w-full" />
+                        ) : (
+                          <select value={editEquipmentId} onChange={e => setEditEquipmentId(e.target.value)} className={editInputCls + " bg-white"}>
+                            {equipmentList.map(eq => (
+                              <option key={eq.id} value={eq.id}>{eq.equipmentType} — {eq.equipmentCode}{eq.location ? ` (${eq.location})` : ""}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      {selectedEquipment && hasChanges && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-amber-600 uppercase mb-1">Changed to</p>
+                          <p className="text-sm text-amber-800">{selectedEquipment.equipmentType} — {selectedEquipment.equipmentCode}</p>
+                        </div>
+                      )}
+                    </div>
+                  </Section>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={handleSaveEdit} disabled={saving || !hasChanges} className="btn-green px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "#1a7a4a" }}>
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <button onClick={() => setEditing(false)} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {detail.findings && <Section title="Issue Description"><p className="text-sm text-gray-700 leading-relaxed">{detail.findings}</p></Section>}
+                  {detail.workPerformed && <Section title="Action Taken"><p className="text-sm text-gray-700 leading-relaxed">{detail.workPerformed}</p></Section>}
+                  {detail.remarks && <Section title="Remarks"><p className="text-sm text-gray-700 leading-relaxed">{detail.remarks}</p></Section>}
+                  {isEditable && (
+                    <button onClick={startEditing} className="btn-green px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ backgroundColor: "#1a7a4a" }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8.5V10h1.5L9.2 4.3 7.7 2.8 2 8.5zM10.3 3.2l-1.5-1.5.7-.7 1.5 1.5-.7.7z" fill="currentColor"/></svg>
+                      Edit Equipment
+                    </button>
+                  )}
+                </>
+              )}
+
+              {detail.partsUsed && detail.partsUsed.length > 0 && !editing && (
                 <Section title="Parts Replaced">
                   <ul className="space-y-1">{detail.partsUsed.map((p,i) => <li key={i} className="text-sm text-gray-700">{p.name} &times; {p.quantity}</li>)}</ul>
                 </Section>
               )}
-              {detail.checklistResults && (
+              {detail.checklistResults && !editing && (
                 <Section title="Checklist Results">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="text-sm text-gray-600">{detail.checklistResults.checkedCount} / {detail.checklistResults.totalCount} items checked</span>
@@ -501,7 +597,6 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
                   ))}
                 </Section>
               )}
-              {detail.remarks && <Section title="Remarks"><p className="text-sm text-gray-700 leading-relaxed">{detail.remarks}</p></Section>}
             </div>
           ) : (
             <div className="space-y-3" style={{ animation: "fadeIn .2s ease" }}>
@@ -788,6 +883,7 @@ export default function AdminDashboard() {
           onClose={() => setSelectedCode(null)}
           onStatusChange={handleStatusChange}
           onToast={addToast}
+          onDetailUpdated={fetchData}
         />
       )}
 
