@@ -16,3 +16,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-barlow), sans-serif;
 }
+
+@layer base {
+  button,
+  a,
+  select,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
