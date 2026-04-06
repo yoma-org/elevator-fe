@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import * as XLSX from "xlsx";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
@@ -133,21 +132,16 @@ function AnimatedNumber({ target }: { target: number }) {
 
 // ─── StatCard ──────────────────────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, unit, ok, onClick, active }: { icon: string; label: string; value: string | number; unit?: string; ok?: boolean; onClick?: () => void; active?: boolean; }) {
+function StatCard({ icon, label, value, unit, ok }: { icon: string; label: string; value: string | number; unit?: string; ok?: boolean; }) {
   const isNum = typeof value === "number";
   return (
-    <div
-      className={`flex-1 bg-white rounded-lg px-5 py-4 border min-w-0 card-hover ${active ? "border-green-500 ring-2 ring-green-100" : "border-gray-200"} ${onClick ? "cursor-pointer" : ""}`}
-      style={{ animation: "slideUp .3s ease both" }}
-      onClick={onClick}
-    >
+    <div className="flex-1 bg-white rounded-lg px-5 py-4 border border-gray-200 min-w-0 card-hover" style={{ animation: "slideUp .3s ease both" }}>
       <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
         <span>{icon}</span>
-        <span className={`font-semibold uppercase tracking-wide ${active ? "text-green-600" : ""}`}>{label}</span>
-        {active && <span className="ml-auto text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-full">FILTERED</span>}
+        <span className="font-semibold uppercase tracking-wide">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className={`text-3xl font-bold ${active ? "text-green-700" : "text-gray-800"}`}>
+        <span className="text-3xl font-bold text-gray-800">
           {isNum ? <AnimatedNumber target={value as number} /> : value}
         </span>
         {unit && <span className="text-sm font-semibold text-gray-500 uppercase ml-1">{unit}</span>}
@@ -238,14 +232,12 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
       <div className="flex items-center gap-2 mt-2">
         <button
           onClick={onClick}
-          className="text-xs px-3.5 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+          className="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.5C3 2.5 1 6 1 6s2 3.5 5 3.5S11 6 11 6s-2-3.5-5-3.5z" stroke="currentColor" strokeWidth="1.2"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/></svg>
           View Details
         </button>
         {order.status === "invoice-ready" && (
-          <button className="btn-green text-xs px-3.5 py-2 rounded-lg text-white font-semibold flex items-center gap-1.5 active:scale-95 shadow-sm" style={{ backgroundColor: "#1a7a4a" }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8.5V10h1.5L9.2 4.3 7.7 2.8 2 8.5zM10.3 3.2l-1.5-1.5.7-.7 1.5 1.5-.7.7z" fill="currentColor"/></svg>
+          <button className="btn-green text-xs px-3 py-1.5 rounded text-white font-semibold" style={{ backgroundColor: "#1a7a4a" }}>
             Generate MMPR
           </button>
         )}
@@ -348,13 +340,13 @@ function AddProjectModal({ onClose, onCreated }: { onClose: () => void; onCreate
           )}
 
           <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={submitting} className="btn-green flex-1 py-3 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm active:scale-[.97] transition-all" style={{ backgroundColor: "#1a7a4a" }}>
+            <button type="submit" disabled={submitting} className="btn-green flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60" style={{ backgroundColor: "#1a7a4a" }}>
               {submitting
                 ? <><svg width="14" height="14" viewBox="0 0 14 14" style={{ animation: "spinArc .7s linear infinite" }}><circle cx="7" cy="7" r="5" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2"/><path d="M7 2A5 5 0 0 1 12 7" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>Creating...</>
-                : <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>Create CBS Call</>
+                : "✓ Create CBS Call"
               }
             </button>
-            <button type="button" onClick={onClose} className="px-5 py-3 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 active:scale-[.97] transition-all">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors">Close</button>
           </div>
         </form>
       </div>
@@ -541,43 +533,12 @@ export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null);
-  const pageSize = 10;
 
   function addToast(text: string, kind: "success" | "error" = "success") {
     const id = ++toastId.current;
     setToasts(p => [...p, { id, text, kind }]);
   }
   function removeToast(id: number) { setToasts(p => p.filter(t => t.id !== id)); }
-
-  function handleStatCardClick(key: string) {
-    if (activeStatFilter === key) {
-      // Toggle off: clear filters
-      setActiveStatFilter(null);
-      setFromDate("");
-      setToDate("");
-      setStatusFilter("all");
-    } else {
-      setActiveStatFilter(key);
-      const now = new Date();
-      if (key === "projectsThisMonth") {
-        const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        setFromDate(startOfMonth);
-        setToDate(today);
-        setStatusFilter("all");
-      } else if (key === "myQueue") {
-        setFromDate("");
-        setToDate("");
-        setStatusFilter("myQueue");
-      } else if (key === "activeJobs") {
-        setFromDate("");
-        setToDate("");
-        setStatusFilter("active");
-      }
-    }
-  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -599,11 +560,7 @@ export default function AdminDashboard() {
     }
   }, [fromDate, toDate, statusFilter]);
 
-  useEffect(() => { setCurrentPage(1); void fetchData(); }, [fetchData]);
-
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
-  const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => { void fetchData(); }, [fetchData]);
 
   function handleStatusChange(code: string, status: string) {
     setOrders(p => p.map(o => o.id === code ? { ...o, status } : o));
@@ -620,16 +577,16 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2 text-sm text-gray-700">
           <span className="text-gray-400">📅</span>
           <span className="font-medium">From:</span>
-          <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setActiveStatFilter(null); }} className={inputCls} />
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls} />
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-700">
           <span className="font-medium">To:</span>
-          <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setActiveStatFilter(null); }} className={inputCls} />
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls} />
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-700">
           <span className="text-gray-400 text-xs">▼</span>
           <span className="font-medium">Status:</span>
-          <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setActiveStatFilter(null); }} className={`${inputCls} bg-white`}>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={`${inputCls} bg-white`}>
             <option value="all">All Statuses</option>
             <option value="scheduled">Scheduled</option>
             <option value="received">CBS Received</option>
@@ -641,9 +598,8 @@ export default function AdminDashboard() {
           </select>
         </div>
         <div className="ml-auto">
-          <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-5 py-2.5 rounded-lg text-white flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-            Add Project
+          <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-4 py-2 rounded text-white" style={{ backgroundColor: "#1a7a4a" }}>
+            + Add Project
           </button>
         </div>
       </div>
@@ -651,64 +607,24 @@ export default function AdminDashboard() {
       {/* Finance export row */}
       <div className="mb-3 flex items-center gap-2 text-sm text-gray-600">
         <span className="font-medium">Finance Report Export:</span>
-        <button
-          disabled={orders.length === 0}
-          onClick={() => {
-            const rows = orders.map((o) => ({
-              "Report Code": o.id ?? "",
-              "Building": o.building ?? "",
-              "Equipment Code": o.equipmentCode ?? "",
-              "Equipment Type": o.equipmentType ?? "",
-              "Status": getStatusCfg(o.status).label,
-              "Maintenance Type": o.maintenanceType ?? "",
-              "Technician": o.technicianName ?? "",
-              "Arrival Date": o.arrivalDateTime ? fmtDate(o.arrivalDateTime) : "",
-              "Arrival Time": o.arrivalDateTime ? fmtTime(o.arrivalDateTime) : "",
-              "Priority": o.priority ?? "",
-              "Findings": o.findings ?? "",
-              "Work Performed": o.workPerformed ?? "",
-              "Parts Used": o.partsUsed?.map((p: { name: string; quantity: number }) => `${p.name} x${p.quantity}`).join(", ") ?? "",
-              "Submitted At": o.submittedAt ? fmtDate(o.submittedAt) : "",
-            }));
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Work Orders");
-            ws["!cols"] = Object.keys(rows[0] ?? {}).map(() => ({ wch: 20 }));
-            XLSX.writeFile(wb, `Finance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-          }}
-          className="btn-green inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg disabled:opacity-50 shadow-sm active:scale-95 transition-all"
-          style={{ backgroundColor: "#e67e22", color: "#fff" }}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6.5L6.5 9l3-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          Export to Excel
+        <button className="btn-green inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#e67e22", color: "#fff" }}>
+          ↓ Download Finance Report (CSV)
         </button>
       </div>
 
       {/* Stats row */}
       <div className="flex gap-3 mb-4 flex-wrap">
-        <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} onClick={() => handleStatCardClick("myQueue")} active={activeStatFilter === "myQueue"} />
-        <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} onClick={() => handleStatCardClick("projectsThisMonth")} active={activeStatFilter === "projectsThisMonth"} />
-        <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} onClick={() => handleStatCardClick("activeJobs")} active={activeStatFilter === "activeJobs"} />
+        <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} />
+        <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} />
+        <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} />
         <StatCard icon="🕐" label="Avg Response Time"   value={stats?.avgResponseTimeMin ?? 45} unit="MIN" ok={true} />
         <StatCard icon="⏱" label="Avg Work Duration"   value={stats?.avgWorkDurationHrs ?? 2.3} unit="HRS" ok={true} />
       </div>
 
       {/* Work orders header */}
       <div className="rounded-t-lg px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "#1a3a2a" }}>
-        <div className="flex items-center gap-3">
-          <h2 className="text-white font-bold text-sm uppercase tracking-widest">
-            {activeStatFilter === "projectsThisMonth" ? "Projects This Month" : activeStatFilter === "myQueue" ? "My Queue" : activeStatFilter === "activeJobs" ? "Active Jobs" : "All Work Orders"}
-          </h2>
-          {activeStatFilter && (
-            <button
-              onClick={() => { setActiveStatFilter(null); setFromDate(""); setToDate(""); setStatusFilter("all"); }}
-              className="text-green-300 hover:text-white text-xs flex items-center gap-1 px-2 py-0.5 rounded-full border border-green-300/30 hover:border-white/50 transition-all"
-            >
-              Clear filter &times;
-            </button>
-          )}
-        </div>
-        {!loading && <span className="text-green-300 text-xs">{sortedOrders.length} records</span>}
+        <h2 className="text-white font-bold text-sm uppercase tracking-widest">All Work Orders</h2>
+        {!loading && <span className="text-green-300 text-xs">{orders.length} records</span>}
       </div>
 
       {/* Work orders list */}
@@ -723,67 +639,17 @@ export default function AdminDashboard() {
           <div className="text-5xl mb-4">📋</div>
           <p className="text-gray-500 font-medium">No work orders found</p>
           <p className="text-gray-400 text-sm mt-1">Try adjusting the filters or create a new CBS Call.</p>
-          <button onClick={() => setShowAddProject(true)} className="btn-green mt-4 text-sm font-semibold px-5 py-2.5 rounded-lg text-white inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-            Add Project
+          <button onClick={() => setShowAddProject(true)} className="btn-green mt-4 text-sm font-semibold px-4 py-2 rounded text-white inline-block" style={{ backgroundColor: "#1a7a4a" }}>
+            + Add Project
           </button>
         </div>
       ) : (
         <div className="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginatedOrders.map((order, i) => (
+            {orders.map((order, i) => (
               <WorkOrderCard key={order.id ?? order.createdAt} order={order} index={i} onClick={() => order.id && setSelectedCode(order.id)} />
             ))}
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-              <span className="text-xs text-gray-500">
-                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, orders.length)} of {orders.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  ‹ Prev
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                  .reduce<(number | "ellipsis")[]>((acc, p, idx, arr) => {
-                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("ellipsis");
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((item, idx) =>
-                    item === "ellipsis" ? (
-                      <span key={`e${idx}`} className="px-1.5 text-xs text-gray-400">…</span>
-                    ) : (
-                      <button
-                        key={item}
-                        onClick={() => setCurrentPage(item)}
-                        className={`min-w-[30px] py-1.5 text-xs rounded border transition-all ${
-                          currentPage === item
-                            ? "bg-green-700 text-white border-green-700 font-bold"
-                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  )}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  Next ›
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
