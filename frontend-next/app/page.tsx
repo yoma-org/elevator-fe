@@ -1289,50 +1289,6 @@ export default function Home() {
                 </section>
               )}
 
-              <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
-                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
-                  Signatures
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Technician Signature
-                    </p>
-                    {formData.techSignature ? (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                        <img
-                          src={formData.techSignature}
-                          alt="Technician signature"
-                          className="h-28 w-full rounded-md bg-white object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
-                        Not signed yet
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Customer Signature
-                    </p>
-                    {formData.customerSignature ? (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                        <img
-                          src={formData.customerSignature}
-                          alt="Customer signature"
-                          className="h-28 w-full rounded-md bg-white object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
-                        Not signed yet
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
             </div>
           )}
 
