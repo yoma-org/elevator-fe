@@ -26,8 +26,8 @@ const stepTitles = [
   "Service Checklist",
   "Photos & Notes",
   "Issues & Parts",
-  "Signatures",
   "Review & Submit",
+  "Signatures",
 ];
 
 const stepDescriptions = [
@@ -35,8 +35,8 @@ const stepDescriptions = [
   "Complete inspection items",
   "Attach evidence and notes",
   "Report any problems or replacements",
-  "Capture completion and signatures",
   "Please review all information before submitting",
+  "Sign and submit the report",
 ];
 
 const checklistByType: Record<string, ChecklistGroup[]> = {
@@ -330,7 +330,7 @@ export default function Home() {
       if (checkedCount < 1) errors.checklist = "Please check at least one checklist item";
     }
 
-    if (currentStep === 5) {
+    if (currentStep === 6) {
       if (!formData.completionDate) errors.completionDate = "Completion date is required";
       if (!formData.completionTime) errors.completionTime = "Completion time is required";
       if (!formData.customerName) errors.customerName = "Customer name is required";
@@ -1244,6 +1244,99 @@ export default function Home() {
           )}
 
           {step === 5 && (
+            <div className="space-y-4">
+              <section className="rounded-xl border-2 border-slate-300 bg-white p-4">
+                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  Basic Information
+                </h3>
+                <dl className="space-y-1.5 text-sm">
+                  <div>Building: {buildings.find((item) => item.id === formData.buildingId)?.name || "-"}</div>
+                  <div>
+                    Equipment: {equipmentList.find((item) => item.id === formData.equipmentId)?.equipmentCode || "-"}
+                  </div>
+                  <div>Service Date: {arrivalDate || "-"}</div>
+                  <div>Arrival: {arrivalTime || "-"}</div>
+                </dl>
+              </section>
+
+              <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
+                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  Service Summary
+                </h3>
+                <div>Checklist passed: {checkedCount}/{totalCount}</div>
+                <div>Issues: {formData.issuesFound || "-"}</div>
+                <div>Parts replaced: {formData.partsReplaced}</div>
+                <div>Photos: {formData.photos.length}</div>
+                <div>Customer: {formData.customerName || "-"}</div>
+                <div>Initial Ticket Status: pending</div>
+              </section>
+
+              {formData.photos.length > 0 && (
+                <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
+                  <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
+                    Photo Evidence
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {formData.photos.map((photo, idx) => (
+                      <figure key={`${photo.name}-${idx}`} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                        <img src={photo.url} alt={photo.name} className="h-24 w-full object-cover" />
+                        <figcaption className="truncate px-2 py-1 text-[11px] text-slate-600" title={photo.name}>
+                          {photo.name}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
+                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  Signatures
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Technician Signature
+                    </p>
+                    {formData.techSignature ? (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                        <img
+                          src={formData.techSignature}
+                          alt="Technician signature"
+                          className="h-28 w-full rounded-md bg-white object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
+                        Not signed yet
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Customer Signature
+                    </p>
+                    {formData.customerSignature ? (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                        <img
+                          src={formData.customerSignature}
+                          alt="Customer signature"
+                          className="h-28 w-full rounded-md bg-white object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
+                        Not signed yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {step === 6 && (
             <div className="space-y-5">
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -1444,99 +1537,6 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-
-          {step === 6 && (
-            <div className="space-y-4">
-              <section className="rounded-xl border-2 border-slate-300 bg-white p-4">
-                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
-                  Basic Information
-                </h3>
-                <dl className="space-y-1.5 text-sm">
-                  <div>Building: {buildings.find((item) => item.id === formData.buildingId)?.name || "-"}</div>
-                  <div>
-                    Equipment: {equipmentList.find((item) => item.id === formData.equipmentId)?.equipmentCode || "-"}
-                  </div>
-                  <div>Service Date: {arrivalDate || "-"}</div>
-                  <div>Arrival: {arrivalTime || "-"}</div>
-                </dl>
-              </section>
-
-              <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
-                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
-                  Service Summary
-                </h3>
-                <div>Checklist passed: {checkedCount}/{totalCount}</div>
-                <div>Issues: {formData.issuesFound || "-"}</div>
-                <div>Parts replaced: {formData.partsReplaced}</div>
-                <div>Photos: {formData.photos.length}</div>
-                <div>Customer: {formData.customerName || "-"}</div>
-                <div>Initial Ticket Status: pending</div>
-              </section>
-
-              {formData.photos.length > 0 && (
-                <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
-                  <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
-                    Photo Evidence
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {formData.photos.map((photo, idx) => (
-                      <figure key={`${photo.name}-${idx}`} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                        <img src={photo.url} alt={photo.name} className="h-24 w-full object-cover" />
-                        <figcaption className="truncate px-2 py-1 text-[11px] text-slate-600" title={photo.name}>
-                          {photo.name}
-                        </figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
-                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
-                  Signatures
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Technician Signature
-                    </p>
-                    {formData.techSignature ? (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                        <img
-                          src={formData.techSignature}
-                          alt="Technician signature"
-                          className="h-28 w-full rounded-md bg-white object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
-                        Not signed yet
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Customer Signature
-                    </p>
-                    {formData.customerSignature ? (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                        <img
-                          src={formData.customerSignature}
-                          alt="Customer signature"
-                          className="h-28 w-full rounded-md bg-white object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
-                        Not signed yet
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
             </div>
           )}
           </div>
