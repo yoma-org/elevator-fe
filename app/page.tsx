@@ -841,9 +841,10 @@ export default function Home() {
 
             <a
               href="/admin"
-              className="rounded-md border border-white/30 bg-white/10 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-white/20"
+              className="rounded-lg border border-white/30 bg-white/10 px-3.5 py-2 text-[11px] font-semibold text-white transition-all hover:bg-white/20 active:scale-95 flex items-center gap-1.5"
             >
-              Admin Portal
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="1" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>
+              Admin
             </a>
           </div>
         </header>
@@ -975,13 +976,14 @@ export default function Home() {
                     Arrival Date &amp; Time <span className="text-red-500">*</span>
                   </label>
                   <button
-                    className="rounded-full bg-[#f59e0b] px-4 py-1.5 text-sm font-bold text-white"
+                    className="rounded-full bg-[#1b3c7b] px-4 py-1.5 text-sm font-bold text-white shadow-sm hover:bg-[#15306a] active:scale-95 transition-all flex items-center gap-1.5"
                     type="button"
                     onClick={() => {
                       const now = getLocalDateTimeParts();
                       updateArrival(now.date, now.time);
                     }}
                   >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                     Now
                   </button>
                 </div>
@@ -1249,13 +1251,14 @@ export default function Home() {
                     Completion Date &amp; Time <span className="text-red-500">*</span>
                   </label>
                   <button
-                    className="rounded-full bg-[#f59e0b] px-4 py-1.5 text-sm font-bold text-white"
+                    className="rounded-full bg-[#1b3c7b] px-4 py-1.5 text-sm font-bold text-white shadow-sm hover:bg-[#15306a] active:scale-95 transition-all flex items-center gap-1.5"
                     type="button"
                     onClick={() => {
                       const now = getLocalDateTimeParts();
                       updateCompletion(now.date, now.time);
                     }}
                   >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                     Now
                   </button>
                 </div>
@@ -1542,25 +1545,27 @@ export default function Home() {
         <footer className="flex gap-3 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]">
           {step > 1 && (
             <button
-              className="nav-btn h-11 flex-1 rounded-lg bg-slate-200 px-4 text-sm font-bold text-slate-800 disabled:opacity-50"
+              className="nav-btn h-12 flex-1 rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-600 disabled:opacity-50 flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-200"
               onClick={goPrev}
               disabled={loading}
             >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               Previous
             </button>
           )}
 
           {step < 6 ? (
             <button
-              className="nav-btn h-11 flex-[1.2] rounded-lg bg-[#f59e0b] px-4 text-sm font-bold text-white disabled:opacity-50"
+              className="nav-btn h-12 flex-[1.2] rounded-xl bg-[#1b3c7b] px-4 text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
               onClick={goNext}
               disabled={loading}
             >
-              Next
+              Next Step
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
           ) : (
             <button
-              className="nav-btn h-11 flex-[1.2] flex items-center justify-center gap-2 rounded-lg bg-[#1b3c7b] px-4 text-sm font-bold text-white disabled:opacity-50"
+              className="nav-btn h-12 flex-[1.2] flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50 shadow-md hover:shadow-lg hover:bg-emerald-700"
               onClick={submitReport}
               disabled={loading}
             >
@@ -1572,7 +1577,12 @@ export default function Home() {
                   </svg>
                   Submitting...
                 </>
-              ) : "Submit Report"}
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8.5l4 4L14 3.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Submit Report
+                </>
+              )}
             </button>
           )}
         </footer>
@@ -1619,10 +1629,11 @@ export default function Home() {
               )}
             </div>
             <button
-              className="w-full rounded-xl bg-[#1b3c7b] py-3 text-sm font-bold text-white hover:bg-[#15306a] active:scale-95 transition-transform"
+              className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
               onClick={resetForm}
             >
-              Close
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 1 1 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M2 11V8h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Start New Report
             </button>
           </div>
         </div>
