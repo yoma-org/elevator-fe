@@ -538,6 +538,7 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [searchQuery, setSearchQuery] = useState("");
 
   function addToast(text: string, kind: "success" | "error" = "success") {
     const id = ++toastId.current;
@@ -567,7 +568,10 @@ export default function AdminDashboard() {
 
   useEffect(() => { setCurrentPage(1); void fetchData(); }, [fetchData]);
 
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const searchFiltered = searchQuery
+    ? orders.filter(o => o.id?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : orders;
+  const sortedOrders = [...searchFiltered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -605,6 +609,16 @@ export default function AdminDashboard() {
             <option value="comm-review">Commercial Review</option>
             <option value="invoice-ready">Invoice Ready</option>
           </select>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span className="text-gray-400">🔍</span>
+          <input
+            type="text"
+            placeholder="Search report code..."
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+            className={`${inputCls} w-44`}
+          />
         </div>
         <div className="ml-auto">
           <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-5 py-2.5 rounded-lg text-white flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
