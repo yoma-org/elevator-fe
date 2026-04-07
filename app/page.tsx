@@ -145,7 +145,7 @@ const createInitialFormData = () => ({
   maintenanceType: "Scheduled/Preventive Maintenance",
   arrivalDateTime: getLocalDateTimeParts().dateTime,
   technicianName: "Ko Aung Mya Oo",
-  checklistState: {} as Record<string, string>,
+  checklistState: {} as Record<string, string[]>,
   issuesFound: "",
   partsReplaced: "no",
   parts: [{ name: "", quantity: "1" }] as PartItem[],
@@ -267,11 +267,11 @@ export default function Home() {
 
   useEffect(() => {
     setFormData((prev) => {
-      const nextChecklist: Record<string, string> = {};
+      const nextChecklist: Record<string, string[]> = {};
       selectedChecklist.forEach((group, groupIndex) => {
         group.items.forEach((_, itemIndex) => {
           const key = `${groupIndex}-${itemIndex}`;
-          nextChecklist[key] = prev.checklistState[key] ?? "";
+          nextChecklist[key] = prev.checklistState[key] ?? [];
         });
       });
 
@@ -326,7 +326,7 @@ export default function Home() {
   }, [formData.buildingId, formData.equipmentType]);
 
   const checkedCount = useMemo(
-    () => Object.values(formData.checklistState).filter((v) => v !== "").length,
+    () => Object.values(formData.checklistState).filter((v) => v.length > 0).length,
     [formData.checklistState],
   );
 
@@ -413,13 +413,19 @@ export default function Home() {
   };
 
   const setChecklistStatus = (key: string, status: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      checklistState: {
-        ...prev.checklistState,
-        [key]: prev.checklistState[key] === status ? "" : status,
-      },
-    }));
+    setFormData((prev) => {
+      const current = prev.checklistState[key] ?? [];
+      const updated = current.includes(status)
+        ? current.filter((s) => s !== status)
+        : [...current, status];
+      return {
+        ...prev,
+        checklistState: {
+          ...prev.checklistState,
+          [key]: updated,
+        },
+      };
+    });
   };
 
   const updatePart = (index: number, key: keyof PartItem, value: string) => {
@@ -788,8 +794,8 @@ export default function Home() {
           category: group.category,
           items: group.items.map((item, itemIndex) => ({
             label: item,
-            status: formData.checklistState[`${groupIndex}-${itemIndex}`] || "",
-            checked: formData.checklistState[`${groupIndex}-${itemIndex}`] !== "",
+            status: (formData.checklistState[`${groupIndex}-${itemIndex}`] ?? []).join(", "),
+            checked: (formData.checklistState[`${groupIndex}-${itemIndex}`] ?? []).length > 0,
           })),
         })),
       };
@@ -1077,14 +1083,14 @@ export default function Home() {
                   </div>
                   {group.items.map((item, itemIndex) => {
                     const key = `${groupIndex}-${itemIndex}`;
-                    const currentStatus = formData.checklistState[key] || "";
+                    const currentStatuses = formData.checklistState[key] ?? [];
                     return (
                       <div key={item} className="mb-3 rounded-xl border-2 border-slate-200 bg-white p-3">
                         <div className="mb-2 text-[15px] font-medium text-slate-800">{item}</div>
                         <div className="flex flex-wrap gap-2">
                           {CHECKLIST_STATUSES.map((status) => {
                             const cfg = CHECKLIST_STATUS_LABELS[status];
-                            const isSelected = currentStatus === status;
+                            const isSelected = currentStatuses.includes(status);
                             return (
                               <button
                                 key={status}
