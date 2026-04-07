@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import SmartTextInput from "../components/SmartTextInput";
 
 type Building = { id: string; name: string };
 type Equipment = { id: string; equipmentType: string; equipmentCode: string };
@@ -1172,11 +1173,14 @@ export default function Home() {
                 <label className="mb-2 block text-[15px] font-semibold text-slate-900">
                   Customer Message
                 </label>
-                <textarea
+                <SmartTextInput
                   className="form-input min-h-[90px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
                   placeholder="Message to include in customer report..."
                   value={formData.customerMessage}
-                  onChange={(event) => updateField("customerMessage", event.target.value)}
+                  onChange={(v) => updateField("customerMessage", v)}
+                  field="remarks"
+                  equipmentType={formData.equipmentType}
+                  minHeight="90px"
                 />
               </div>
             </div>
