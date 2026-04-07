@@ -8,7 +8,7 @@ const API_BASE_URL =
 interface SmartTextInputProps {
   value: string;
   onChange: (value: string) => void;
-  field: "findings" | "remarks" | "parts";
+  field: "findings" | "remarks" | "parts" | "notes";
   equipmentType?: string;
   placeholder?: string;
   multiline?: boolean;

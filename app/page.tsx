@@ -1172,11 +1172,14 @@ export default function Home() {
                 <label className="mb-2 block text-[15px] font-semibold text-slate-900">
                   Additional Notes
                 </label>
-                <textarea
+                <SmartTextInput
                   className="form-input min-h-[120px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
                   placeholder="Any additional comments or observations..."
                   value={formData.additionalNotes}
-                  onChange={(event) => updateField("additionalNotes", event.target.value)}
+                  onChange={(v) => updateField("additionalNotes", v)}
+                  field="notes"
+                  equipmentType={formData.equipmentType}
+                  minHeight="120px"
                 />
               </div>
 
@@ -1203,11 +1206,14 @@ export default function Home() {
                 <label className="mb-2 block text-[15px] font-semibold text-slate-900">
                   Any issues or abnormalities?
                 </label>
-                <textarea
+                <SmartTextInput
                   className="form-input min-h-[120px] w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base shadow-sm transition-all"
                   placeholder="Describe any issues found during inspection..."
                   value={formData.issuesFound}
-                  onChange={(event) => updateField("issuesFound", event.target.value)}
+                  onChange={(v) => updateField("issuesFound", v)}
+                  field="findings"
+                  equipmentType={formData.equipmentType}
+                  minHeight="120px"
                 />
               </div>
 
