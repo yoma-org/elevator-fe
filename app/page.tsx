@@ -845,28 +845,28 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
       <style>{FORM_STYLES}</style>
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-lg">
-        <header className="bg-[#1b3c7b] px-4 py-3 text-white shadow-md">
+      <div className="mx-auto flex min-h-screen w-full max-w-md sm:max-w-lg md:max-w-2xl flex-col bg-white shadow-lg sm:my-0 md:my-4 md:min-h-0 md:rounded-2xl md:shadow-2xl">
+        <header className="bg-[#1b3c7b] px-4 py-3.5 sm:px-6 text-white shadow-md md:rounded-t-2xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 items-center justify-center rounded-md bg-white px-2.5">
-                <span className="text-[11px] leading-tight font-bold text-[#1b3c7b]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shrink-0">
+                <span className="text-[10px] leading-tight font-bold text-[#1b3c7b] text-center">
                   YOMA
                   <br />
-                  ELEVATOR
+                  ELEV
                 </span>
               </div>
               <div>
-                <h1 className="text-base font-bold leading-tight">Maintenance Service Report</h1>
-                <p className="text-xs text-white/80">Scheduled/Preventive Maintenance</p>
+                <h1 className="text-base sm:text-lg font-bold leading-tight">Maintenance Service Report</h1>
+                <p className="text-xs text-white/70">YECL Field Technician Form</p>
               </div>
             </div>
 
             <a
               href="/admin"
-              className="rounded-lg border border-white/30 bg-white/10 px-3.5 py-2 text-[11px] font-semibold text-white transition-all hover:bg-white/20 active:scale-95 flex items-center gap-1.5"
+              className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-[11px] font-semibold text-white transition-all hover:bg-white/20 active:scale-95 flex items-center gap-1.5 shrink-0"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="1" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>
               Admin
@@ -874,49 +874,51 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="bg-white px-4 pb-3 pt-4 shadow-sm">
+        <div className="bg-white px-4 sm:px-6 pb-3 pt-4 shadow-sm">
           <div className="relative mb-3 flex items-center justify-between">
             <div className="absolute inset-x-0 top-1/2 z-[1] h-[3px] -translate-y-1/2 rounded-full bg-slate-200" />
             <div
               className="absolute left-0 top-1/2 z-[1] h-[3px] -translate-y-1/2 rounded-full bg-[#16a34a] transition-all duration-500"
               style={{ width: `${((step - 1) / 5) * 100}%` }}
             />
-            {stepTitles.map((_, index) => {
+            {stepTitles.map((title, index) => {
               const current = index + 1;
               const active = current === step;
               const completed = current < step;
               return (
-                <div
-                  key={current}
-                  className="step-dot relative z-[2] flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-xs font-bold transition-all duration-300"
-                  style={
-                    active ? { background: "#1b3c7b", borderColor: "#1b3c7b", color: "#fff", transform: "scale(1.15)", boxShadow: "0 2px 8px rgba(27,60,123,.35)" }
-                    : completed ? { background: "#16a34a", borderColor: "#16a34a", color: "#fff", boxShadow: "0 2px 6px rgba(22,163,74,.3)" }
-                    : { color: "#94a3b8" }
-                  }
-                >
-                  {completed
-                    ? <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    : current
-                  }
+                <div key={current} className="relative z-[2] flex flex-col items-center gap-1.5">
+                  <div
+                    className="step-dot flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-xs font-bold transition-all duration-300"
+                    style={
+                      active ? { background: "#1b3c7b", borderColor: "#1b3c7b", color: "#fff", transform: "scale(1.1)", boxShadow: "0 2px 8px rgba(27,60,123,.35)" }
+                      : completed ? { background: "#16a34a", borderColor: "#16a34a", color: "#fff", boxShadow: "0 2px 6px rgba(22,163,74,.3)" }
+                      : { color: "#94a3b8" }
+                    }
+                  >
+                    {completed
+                      ? <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      : current
+                    }
+                  </div>
+                  <span className={`hidden sm:block text-[10px] font-medium max-w-[70px] text-center leading-tight ${active ? "text-[#1b3c7b]" : completed ? "text-green-600" : "text-slate-400"}`}>{title}</span>
                 </div>
               );
             })}
           </div>
-          <div className="flex items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center gap-1.5 sm:hidden">
             <p className="text-center text-xs font-semibold text-slate-500">{stepTitles[step - 1]}</p>
             <span className="text-xs text-slate-400">·</span>
             <p className="text-xs text-slate-400">{step} of 6</p>
           </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto px-4 py-5">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
           <div
             key={step}
             style={{ animation: `${stepDir === "forward" ? "slideInFwd" : "slideInBwd"} .22s ease both` }}
           >
-          <h2 className="mb-1 text-2xl font-bold text-[#1b3c7b]">{stepTitles[step - 1]}</h2>
-          <p className="mb-5 text-[15px] text-slate-500">{stepDescriptions[step - 1]}</p>
+          <h2 className="mb-1 text-xl sm:text-2xl font-bold text-[#1b3c7b]">{stepTitles[step - 1]}</h2>
+          <p className="mb-5 text-sm sm:text-[15px] text-slate-500">{stepDescriptions[step - 1]}</p>
 
           {step === 1 && (
             <div className="space-y-5">
@@ -1534,10 +1536,10 @@ export default function Home() {
           </div>
         </main>
 
-        <footer className="flex gap-3 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]">
+        <footer className="flex gap-3 bg-white px-4 sm:px-6 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] md:rounded-b-2xl">
           {step > 1 && (
             <button
-              className="nav-btn h-12 flex-1 rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-600 disabled:opacity-50 flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-200"
+              className="nav-btn h-12 sm:h-11 flex-1 rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-600 disabled:opacity-50 flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-200 active:scale-[.98] transition-all"
               onClick={goPrev}
               disabled={loading}
             >
@@ -1548,7 +1550,7 @@ export default function Home() {
 
           {step < 6 ? (
             <button
-              className="nav-btn h-12 flex-[1.2] rounded-xl bg-[#1b3c7b] px-4 text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+              className="nav-btn h-12 sm:h-11 flex-[1.2] rounded-xl bg-[#1b3c7b] px-4 text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:bg-[#15306a] active:scale-[.98] transition-all"
               onClick={goNext}
               disabled={loading}
             >
@@ -1557,7 +1559,7 @@ export default function Home() {
             </button>
           ) : (
             <button
-              className="nav-btn h-12 flex-[1.2] flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50 shadow-md hover:shadow-lg hover:bg-emerald-700"
+              className="nav-btn h-12 sm:h-11 flex-[1.2] flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50 shadow-md hover:shadow-lg hover:bg-emerald-700 active:scale-[.98] transition-all"
               onClick={submitReport}
               disabled={loading}
             >
@@ -1580,9 +1582,10 @@ export default function Home() {
         </footer>
 
         {submitMessage && (
-          <p className="mx-4 mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {submitMessage}
-          </p>
+          <div className="mx-4 sm:mx-6 mb-4 rounded-xl bg-red-50 border border-red-200 p-3 flex items-start gap-2">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-red-500 shrink-0 mt-0.5"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M8 5v3.5M8 11h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            <p className="text-sm text-red-700">{submitMessage}</p>
+          </div>
         )}
       </div>
 
