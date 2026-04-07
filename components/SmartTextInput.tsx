@@ -193,11 +193,23 @@ export default function SmartTextInput({
         />
       )}
 
-      {/* Tab hint */}
+      {/* Accept hint — tap on mobile, Tab on desktop */}
       {showGhost && (
-        <span className="absolute bottom-1.5 right-2 z-10 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-400">
-          Tab ↹
-        </span>
+        <button
+          type="button"
+          className="absolute bottom-1.5 right-2 z-10 rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 active:bg-slate-300 sm:px-1.5 sm:py-0.5 sm:text-[11px] sm:font-normal sm:bg-slate-100 sm:text-slate-400"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            acceptGhost();
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            acceptGhost();
+          }}
+        >
+          <span className="sm:hidden">Accept ✓</span>
+          <span className="hidden sm:inline">Tab ↹</span>
+        </button>
       )}
     </div>
   );
