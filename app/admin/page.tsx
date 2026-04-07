@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
+import BatchUploadModal from "../../components/BatchUploadModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
@@ -646,6 +647,7 @@ function AdminDashboardInner() {
   const [loading, setLoading] = useState(true);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [showAddProject, setShowAddProject] = useState(false);
+  const [showBatchUpload, setShowBatchUpload] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastId = useRef(0);
 
@@ -795,6 +797,10 @@ function AdminDashboardInner() {
             >
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6.5L6.5 9l3-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
               Export
+            </button>
+            <button onClick={() => setShowBatchUpload(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 10V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              Batch Upload
             </button>
             <button onClick={() => setShowAddProject(true)} className="btn-green text-xs font-semibold px-4 py-2 rounded-lg text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
               <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
@@ -951,6 +957,15 @@ function AdminDashboardInner() {
         <AddProjectModal
           onClose={() => setShowAddProject(false)}
           onCreated={(msg) => { void fetchData(); addToast(msg, "success"); }}
+        />
+      )}
+
+      {/* Batch Upload modal */}
+      {showBatchUpload && (
+        <BatchUploadModal
+          onClose={() => setShowBatchUpload(false)}
+          onDone={() => { void fetchData(); addToast("Batch upload completed", "success"); }}
+          buildings={uniqueBuildings}
         />
       )}
 
