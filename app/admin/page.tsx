@@ -792,14 +792,8 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
             </div>
           ) : (
             <div style={{ animation: "fadeIn .2s ease" }}>
-              {/* Add note form */}
-              <NoteForm code={code} onAdded={(note) => {
-                setDetail(prev => prev ? { ...prev, internalNotes: [...(prev.internalNotes ?? []), note] } : prev);
-                onToast("Note added", "success");
-              }} />
-
               {/* Notes timeline */}
-              <div className="space-y-0 mt-4">
+              <div className="space-y-0">
                 {!detail.internalNotes || detail.internalNotes.length === 0
                   ? (
                     <div className="text-center py-12">
@@ -835,6 +829,16 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
             </div>
           )}
         </div>
+
+        {/* Sticky note form at bottom — only on activity tab */}
+        {tab === "notes" && detail && (
+          <div className="border-t border-gray-200 bg-white p-4 rounded-b-2xl">
+            <NoteForm code={code} onAdded={(note) => {
+              setDetail(prev => prev ? { ...prev, internalNotes: [...(prev.internalNotes ?? []), note] } : prev);
+              onToast("Note added", "success");
+            }} />
+          </div>
+        )}
       </div>
     </div>
   );
