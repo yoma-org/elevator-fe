@@ -874,41 +874,51 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="bg-white px-4 sm:px-6 pb-3 pt-4 shadow-sm">
-          <div className="relative mb-3 flex items-center justify-between">
-            <div className="absolute inset-x-0 top-1/2 z-[1] h-[3px] -translate-y-1/2 rounded-full bg-slate-200" />
-            <div
-              className="absolute left-0 top-1/2 z-[1] h-[3px] -translate-y-1/2 rounded-full bg-[#16a34a] transition-all duration-500"
-              style={{ width: `${((step - 1) / 5) * 100}%` }}
-            />
+        <div className="bg-white px-3 sm:px-6 pb-3 pt-4 shadow-sm border-b border-slate-100">
+          {/* Step indicators */}
+          <div className="relative flex items-start justify-between mb-1">
+            {/* Progress track */}
+            <div className="absolute left-0 right-0 top-[18px] sm:top-[20px] z-[1] h-[2px] mx-[18px] sm:mx-[20px]">
+              <div className="h-full rounded-full bg-slate-200" />
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-[#16a34a] transition-all duration-500 ease-out"
+                style={{ width: `${((step - 1) / 5) * 100}%` }}
+              />
+            </div>
+
             {stepTitles.map((title, index) => {
               const current = index + 1;
               const active = current === step;
               const completed = current < step;
               return (
-                <div key={current} className="relative z-[2] flex flex-col items-center gap-1.5">
+                <div key={current} className="relative z-[2] flex flex-col items-center" style={{ width: `${100 / 6}%` }}>
                   <div
-                    className="step-dot flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-xs font-bold transition-all duration-300"
-                    style={
-                      active ? { background: "#1b3c7b", borderColor: "#1b3c7b", color: "#fff", transform: "scale(1.1)", boxShadow: "0 2px 8px rgba(27,60,123,.35)" }
-                      : completed ? { background: "#16a34a", borderColor: "#16a34a", color: "#fff", boxShadow: "0 2px 6px rgba(22,163,74,.3)" }
-                      : { color: "#94a3b8" }
-                    }
+                    className="flex items-center justify-center rounded-full border-2 text-[11px] font-bold transition-all duration-300"
+                    style={{
+                      width: active ? 40 : 36,
+                      height: active ? 40 : 36,
+                      ...(active
+                        ? { background: "#1b3c7b", borderColor: "#1b3c7b", color: "#fff", boxShadow: "0 3px 12px rgba(27,60,123,.3)" }
+                        : completed
+                        ? { background: "#16a34a", borderColor: "#16a34a", color: "#fff", boxShadow: "0 2px 6px rgba(22,163,74,.2)" }
+                        : { background: "#fff", borderColor: "#e2e8f0", color: "#94a3b8" }),
+                    }}
                   >
-                    {completed
-                      ? <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      : current
-                    }
+                    {completed ? (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3L11.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    ) : current}
                   </div>
-                  <span className={`hidden sm:block text-[10px] font-medium max-w-[70px] text-center leading-tight ${active ? "text-[#1b3c7b]" : completed ? "text-green-600" : "text-slate-400"}`}>{title}</span>
+                  <span
+                    className={`mt-1.5 text-center leading-tight transition-colors duration-300 ${
+                      active ? "text-[#1b3c7b] font-semibold" : completed ? "text-green-600 font-medium" : "text-slate-400 font-medium"
+                    }`}
+                    style={{ fontSize: 10, maxWidth: 64, display: "block" }}
+                  >
+                    {title}
+                  </span>
                 </div>
               );
             })}
-          </div>
-          <div className="flex items-center justify-center gap-1.5 sm:hidden">
-            <p className="text-center text-xs font-semibold text-slate-500">{stepTitles[step - 1]}</p>
-            <span className="text-xs text-slate-400">·</span>
-            <p className="text-xs text-slate-400">{step} of 6</p>
           </div>
         </div>
 
