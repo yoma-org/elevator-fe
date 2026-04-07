@@ -201,56 +201,61 @@ function SkeletonCard() {
 // ─── WorkOrderCard ─────────────────────────────────────────────────────────────
 
 function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: () => void; index: number; }) {
-  const isActive = order.status === "active" || order.status === "in-progress";
-  const isScheduled = order.status === "scheduled";
   return (
     <div
-      className="bg-white rounded-lg border border-gray-200 p-4 card-hover"
+      onClick={onClick}
+      className="bg-white rounded-xl border border-gray-200 p-4 card-hover cursor-pointer group"
       style={{ animation: `slideUp .25s ${index * 0.04}s ease both` }}
     >
-      <div className="flex items-start justify-between mb-3 gap-2">
-        <span className="text-sm font-bold text-gray-800 font-mono tracking-tight">{order.id ?? "—"}</span>
+      {/* Header: code + status */}
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-sm font-bold text-gray-800 font-mono tracking-tight truncate">{order.id ?? "—"}</span>
+          <span className="hidden sm:inline text-[10px] text-gray-400 font-medium px-1.5 py-0.5 bg-gray-100 rounded">{order.equipmentType}</span>
+        </div>
         <StatusBadge status={order.status} />
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-3">
-        <div><span className="text-gray-400">Building: </span><span className="text-gray-700 font-medium">{order.building}</span></div>
-        <div><span className="text-gray-400">Lift No.: </span><span className="text-gray-700 font-medium">{order.equipmentCode}</span></div>
-        <div><span className="text-gray-400">Technician: </span><span className="text-gray-700 font-medium">{order.technicianName}</span></div>
-        {isScheduled
-          ? <div><span className="text-gray-400">Type: </span><span className="text-gray-700 font-medium">{order.maintenanceType}</span></div>
-          : <div><span className="text-gray-400">Date: </span><span className="text-gray-700 font-medium">{fmtDate(order.arrivalDateTime)}</span></div>
-        }
+      {/* Info grid */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
+        <div className="flex items-center gap-1.5">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><path d="M2 2h8v8H2z" stroke="currentColor" strokeWidth="1.1"/><path d="M4 1v2M8 1v2M2 5h8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+          <span className="text-gray-700 font-medium">{order.building}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><rect x="3" y="1" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M5 8h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+          <span className="text-gray-700 font-medium">{order.equipmentCode}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><circle cx="6" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.1"/><path d="M1.5 11c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" stroke="currentColor" strokeWidth="1.1"/></svg>
+          <span className="text-gray-700 font-medium">{order.technicianName}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.1"/><path d="M6 3v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+          <span className="text-gray-700 font-medium">{fmtDate(order.arrivalDateTime)} {fmtTime(order.arrivalDateTime)}</span>
+        </div>
       </div>
 
-      {!isScheduled && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3">
-          <div><span className="text-gray-400">Response: </span><span className="text-green-600 font-medium">45 mins ✅ Met SLA</span></div>
-          {isActive
-            ? <div><span className="text-gray-400">Started: </span><span className="text-gray-700 font-medium">{fmtDate(order.arrivalDateTime)} {fmtTime(order.arrivalDateTime)}</span></div>
-            : <div><span className="text-gray-400">Duration: </span><span className="text-green-600 font-medium">2.3 hrs ✅ Met SLA</span></div>
-          }
-        </div>
-      )}
-
-      {order.findings && (
-        <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">{order.findings}</p>
-      )}
-
-      <div className="flex items-center gap-2 mt-2">
-        <button
-          onClick={onClick}
-          className="text-xs px-3.5 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.5C3 2.5 1 6 1 6s2 3.5 5 3.5S11 6 11 6s-2-3.5-5-3.5z" stroke="currentColor" strokeWidth="1.2"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/></svg>
-          View Details
-        </button>
-        {order.status === "invoice-ready" && (
-          <button className="btn-green text-xs px-3.5 py-2 rounded-lg text-white font-semibold flex items-center gap-1.5 active:scale-95 shadow-sm" style={{ backgroundColor: "#1a7a4a" }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8.5V10h1.5L9.2 4.3 7.7 2.8 2 8.5zM10.3 3.2l-1.5-1.5.7-.7 1.5 1.5-.7.7z" fill="currentColor"/></svg>
-            Generate MMPR
-          </button>
+      {/* Maintenance type tag */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{order.maintenanceType}</span>
+        {order.priority && order.priority !== "Medium" && (
+          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${order.priority === "High" || order.priority === "Urgent" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>{order.priority}</span>
         )}
+      </div>
+
+      {/* Findings preview */}
+      {order.findings && (
+        <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed border-l-2 border-gray-200 pl-2.5">{order.findings}</p>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <span className="text-[10px] text-gray-400">{order.submittedAt ? `Submitted ${fmtDate(order.submittedAt)}` : ""}</span>
+        <span className="text-xs text-green-700 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+          View details
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L7 5l-3.5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </span>
       </div>
     </div>
   );
@@ -739,19 +744,16 @@ function AdminDashboardInner() {
       <style>{ANIM_STYLES}</style>
 
       {/* Sticky filter bar */}
-      <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 mb-3 flex flex-wrap items-center gap-4 sticky top-3 z-10 shadow-sm">
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="text-gray-400">📅</span>
-          <span className="font-medium">From:</span>
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls} />
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="font-medium">To:</span>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls} />
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="text-gray-400 text-xs">▼</span>
-          <span className="font-medium">Status:</span>
+      <div className="bg-white rounded-xl border border-gray-200 mb-4 sticky top-3 z-10 shadow-sm overflow-hidden">
+        {/* Row 1: Date range + Status + Actions */}
+        <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-gray-100">
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-400"><rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1 5.5h12M4 1v3M10 1v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={`${inputCls} w-[130px]`} />
+            <span className="text-gray-300">—</span>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={`${inputCls} w-[130px]`} />
+          </div>
+          <div className="h-5 w-px bg-gray-200 hidden sm:block" />
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={`${inputCls} bg-white`}>
             <option value="all">All Statuses</option>
             <option value="scheduled">Scheduled</option>
@@ -763,151 +765,120 @@ function AdminDashboardInner() {
             <option value="invoice-ready">Invoice Ready</option>
             <option value="closed">Closed</option>
           </select>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              disabled={orders.length === 0}
+              onClick={() => {
+                const rows = orders.map((o) => ({
+                  "Report Code": o.id ?? "",
+                  "Building": o.building ?? "",
+                  "Equipment Code": o.equipmentCode ?? "",
+                  "Equipment Type": o.equipmentType ?? "",
+                  "Status": getStatusCfg(o.status).label,
+                  "Maintenance Type": o.maintenanceType ?? "",
+                  "Technician": o.technicianName ?? "",
+                  "Arrival Date": o.arrivalDateTime ? fmtDate(o.arrivalDateTime) : "",
+                  "Arrival Time": o.arrivalDateTime ? fmtTime(o.arrivalDateTime) : "",
+                  "Priority": o.priority ?? "",
+                  "Findings": o.findings ?? "",
+                  "Work Performed": o.workPerformed ?? "",
+                  "Parts Used": o.partsUsed?.map((p: { name: string; quantity: number }) => `${p.name} x${p.quantity}`).join(", ") ?? "",
+                  "Submitted At": o.submittedAt ? fmtDate(o.submittedAt) : "",
+                }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Work Orders");
+                ws["!cols"] = Object.keys(rows[0] ?? {}).map(() => ({ wch: 20 }));
+                XLSX.writeFile(wb, `Finance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-all active:scale-95"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6.5L6.5 9l3-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              Export
+            </button>
+            <button onClick={() => setShowAddProject(true)} className="btn-green text-xs font-semibold px-4 py-2 rounded-lg text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              Add Project
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="font-medium">Building:</span>
-          <input
-            type="text"
-            list="building-list"
-            placeholder="All Buildings"
-            value={buildingFilter === "all" ? "" : buildingFilter}
-            onChange={e => { setBuildingFilter(e.target.value || "all"); setCurrentPage(1); }}
-            className={`${inputCls} w-44`}
-          />
-          <datalist id="building-list">
-            {uniqueBuildings.map(b => <option key={b} value={b} />)}
-          </datalist>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="text-gray-400">🔍</span>
-          <input
-            type="text"
-            list="project-name-list"
-            placeholder="Project name..."
-            value={projectNameFilter}
-            onChange={e => { setProjectNameFilter(e.target.value); setCurrentPage(1); }}
-            className={`${inputCls} w-36`}
-          />
-          <datalist id="project-name-list">
-            {uniqueProjectNames.map(n => <option key={n} value={n} />)}
-          </datalist>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="text-gray-400">🔧</span>
-          <input
-            type="text"
-            list="parts-list"
-            placeholder="Item / Parts..."
-            value={partsFilter}
-            onChange={e => { setPartsFilter(e.target.value); setCurrentPage(1); }}
-            className={`${inputCls} w-36`}
-          />
-          <datalist id="parts-list">
-            {uniqueParts.map(p => <option key={p} value={p} />)}
-          </datalist>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <span className="text-gray-400">🔍</span>
-          <input
-            type="text"
-            list="report-code-list"
-            placeholder="Report code..."
-            value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className={`${inputCls} w-36`}
-          />
-          <datalist id="report-code-list">
-            {uniqueReportCodes.map(c => <option key={c} value={c} />)}
-          </datalist>
-        </div>
-        <div className="ml-auto">
-          <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-5 py-2.5 rounded-lg text-white flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-            Add Project
-          </button>
-        </div>
-      </div>
 
-      {/* Finance export row */}
-      <div className="mb-3 flex items-center gap-2 text-sm text-gray-600">
-        <span className="font-medium">Finance Report Export:</span>
-        <button
-          disabled={orders.length === 0}
-          onClick={() => {
-            const rows = orders.map((o) => ({
-              "Report Code": o.id ?? "",
-              "Building": o.building ?? "",
-              "Equipment Code": o.equipmentCode ?? "",
-              "Equipment Type": o.equipmentType ?? "",
-              "Status": getStatusCfg(o.status).label,
-              "Maintenance Type": o.maintenanceType ?? "",
-              "Technician": o.technicianName ?? "",
-              "Arrival Date": o.arrivalDateTime ? fmtDate(o.arrivalDateTime) : "",
-              "Arrival Time": o.arrivalDateTime ? fmtTime(o.arrivalDateTime) : "",
-              "Priority": o.priority ?? "",
-              "Findings": o.findings ?? "",
-              "Work Performed": o.workPerformed ?? "",
-              "Parts Used": o.partsUsed?.map((p: { name: string; quantity: number }) => `${p.name} x${p.quantity}`).join(", ") ?? "",
-              "Submitted At": o.submittedAt ? fmtDate(o.submittedAt) : "",
-            }));
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Work Orders");
-            ws["!cols"] = Object.keys(rows[0] ?? {}).map(() => ({ wch: 20 }));
-            XLSX.writeFile(wb, `Finance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-          }}
-          className="btn-green inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg disabled:opacity-50 shadow-sm active:scale-95 transition-all"
-          style={{ backgroundColor: "#e67e22", color: "#fff" }}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6.5L6.5 9l3-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          Export to Excel
-        </button>
+        {/* Row 2: Search filters */}
+        <div className="px-4 py-2.5 flex flex-wrap items-center gap-3 bg-gray-50/60">
+          <div className="flex items-center gap-1.5 text-sm">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-gray-400"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/><path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            <input type="text" list="report-code-list" placeholder="Report code" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }} className={`${inputCls} w-32`} />
+            <datalist id="report-code-list">{uniqueReportCodes.map(c => <option key={c} value={c} />)}</datalist>
+          </div>
+          <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+          <input type="text" list="building-list" placeholder="Building" value={buildingFilter === "all" ? "" : buildingFilter} onChange={e => { setBuildingFilter(e.target.value || "all"); setCurrentPage(1); }} className={`${inputCls} w-40`} />
+          <datalist id="building-list">{uniqueBuildings.map(b => <option key={b} value={b} />)}</datalist>
+          <input type="text" list="project-name-list" placeholder="Project name" value={projectNameFilter} onChange={e => { setProjectNameFilter(e.target.value); setCurrentPage(1); }} className={`${inputCls} w-36`} />
+          <datalist id="project-name-list">{uniqueProjectNames.map(n => <option key={n} value={n} />)}</datalist>
+          <input type="text" list="parts-list" placeholder="Item / Parts" value={partsFilter} onChange={e => { setPartsFilter(e.target.value); setCurrentPage(1); }} className={`${inputCls} w-32`} />
+          <datalist id="parts-list">{uniqueParts.map(p => <option key={p} value={p} />)}</datalist>
+          {(searchQuery || (buildingFilter && buildingFilter !== "all") || projectNameFilter || partsFilter || fromDate || toDate || statusFilter !== "all") && (
+            <button
+              onClick={() => { setSearchQuery(""); setBuildingFilter("all"); setProjectNameFilter(""); setPartsFilter(""); setFromDate(""); setToDate(""); setStatusFilter("all"); setStatsFilter(null); setCurrentPage(1); }}
+              className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors ml-auto"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats row */}
-      <div className="flex gap-3 mb-4 flex-wrap">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} active={statsFilter === "myQueue"} onClick={() => { setStatsFilter(f => f === "myQueue" ? null : "myQueue"); setCurrentPage(1); }} />
         <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} active={statsFilter === "projectsThisMonth"} onClick={() => { setStatsFilter(f => f === "projectsThisMonth" ? null : "projectsThisMonth"); setCurrentPage(1); }} />
         <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} active={statsFilter === "activeJobs"} onClick={() => { setStatsFilter(f => f === "activeJobs" ? null : "activeJobs"); setCurrentPage(1); }} />
-        <StatCard icon="🕐" label="Avg Response Time"   value={stats?.avgResponseTimeMin ?? 45} unit="MIN" ok={true} />
-        <StatCard icon="⏱" label="Avg Work Duration"   value={stats?.avgWorkDurationHrs ?? 2.3} unit="HRS" ok={true} />
+        <StatCard icon="🕐" label="Avg Response"        value={stats?.avgResponseTimeMin ?? 45} unit="MIN" ok={true} />
+        <StatCard icon="⏱" label="Avg Duration"        value={stats?.avgWorkDurationHrs ?? 2.3} unit="HRS" ok={true} />
       </div>
 
       {/* Work orders header */}
-      <div className="rounded-t-lg px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "#1a3a2a" }}>
-        <h2 className="text-white font-bold text-sm uppercase tracking-widest">
-          {statsFilter === "myQueue" ? "My Queue" : statsFilter === "projectsThisMonth" ? "Projects This Month" : statsFilter === "activeJobs" ? "Active Jobs" : "All Work Orders"}
-        </h2>
-        {!loading && (
-          <div className="flex items-center gap-2">
-            <span className="text-green-300 text-xs">{sortedOrders.length} records</span>
-            {statsFilter && (
-              <button onClick={() => { setStatsFilter(null); setCurrentPage(1); }} className="text-xs text-green-200 hover:text-white transition-colors underline">Clear</button>
-            )}
-          </div>
+      <div className="rounded-t-xl px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "#1a3a2a" }}>
+        <div className="flex items-center gap-3">
+          <h2 className="text-white font-bold text-sm uppercase tracking-widest">
+            {statsFilter === "myQueue" ? "My Queue" : statsFilter === "projectsThisMonth" ? "Projects This Month" : statsFilter === "activeJobs" ? "Active Jobs" : "Work Orders"}
+          </h2>
+          {!loading && (
+            <span className="text-green-400/80 text-xs font-medium bg-white/10 px-2 py-0.5 rounded-full">
+              {sortedOrders.length}{sortedOrders.length !== orders.length ? ` / ${orders.length}` : ""}
+            </span>
+          )}
+        </div>
+        {statsFilter && (
+          <button onClick={() => { setStatsFilter(null); setCurrentPage(1); }} className="text-xs text-green-300 hover:text-white transition-colors flex items-center gap-1">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            Clear stat filter
+          </button>
         )}
       </div>
 
       {/* Work orders list */}
       {loading ? (
-        <div className="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         </div>
-      ) : orders.length === 0 ? (
-        <div className="bg-white rounded-b-lg border border-t-0 border-gray-200 p-16 text-center" style={{ animation: "fadeIn .3s ease" }}>
+      ) : sortedOrders.length === 0 ? (
+        <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 p-16 text-center" style={{ animation: "fadeIn .3s ease" }}>
           <div className="text-5xl mb-4">📋</div>
-          <p className="text-gray-500 font-medium">No work orders found</p>
-          <p className="text-gray-400 text-sm mt-1">Try adjusting the filters or create a new CBS Call.</p>
-          <button onClick={() => setShowAddProject(true)} className="btn-green mt-4 text-sm font-semibold px-5 py-2.5 rounded-lg text-white inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-            Add Project
-          </button>
+          <p className="text-gray-500 font-medium">{orders.length === 0 ? "No work orders found" : "No results match your filters"}</p>
+          <p className="text-gray-400 text-sm mt-1">{orders.length === 0 ? "Create a new CBS Call to get started." : "Try adjusting or clearing your filters."}</p>
+          {orders.length === 0 && (
+            <button onClick={() => setShowAddProject(true)} className="btn-green mt-4 text-sm font-semibold px-5 py-2.5 rounded-lg text-white inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              Add Project
+            </button>
+          )}
         </div>
       ) : (
-        <div className="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {paginatedOrders.map((order, i) => (
               <WorkOrderCard key={order.id ?? order.createdAt} order={order} index={i} onClick={() => order.id && setSelectedCode(order.id)} />
             ))}
@@ -917,7 +888,7 @@ function AdminDashboardInner() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
               <span className="text-xs text-gray-500">
-                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, orders.length)} of {orders.length}
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, sortedOrders.length)} of {sortedOrders.length}
               </span>
               <div className="flex items-center gap-1">
                 <button
