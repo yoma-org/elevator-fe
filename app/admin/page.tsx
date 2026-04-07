@@ -477,7 +477,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function NoteForm({ code, onAdded }: { code: string; onAdded: (note: { id: string; at: string; author: string; kind: string; text: string }) => void }) {
   const [text, setText] = useState("");
-  const [kind, setKind] = useState("dispatch");
   const [sending, setSending] = useState(false);
 
   const handleSubmit = async () => {
@@ -487,9 +486,9 @@ function NoteForm({ code, onAdded }: { code: string; onAdded: (note: { id: strin
       await fetch(`${API_BASE}/maintenance-reports/admin/${code}/notes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), kind, author: "ADMIN" }),
+        body: JSON.stringify({ text: text.trim(), kind: "dispatch", author: "ADMIN" }),
       });
-      const newNote = { id: crypto.randomUUID(), at: new Date().toISOString(), author: "ADMIN", kind, text: text.trim() };
+      const newNote = { id: crypto.randomUUID(), at: new Date().toISOString(), author: "ADMIN", kind: "dispatch", text: text.trim() };
       onAdded(newNote);
       setText("");
     } catch { /* ignore */ } finally {
@@ -508,11 +507,6 @@ function NoteForm({ code, onAdded }: { code: string; onAdded: (note: { id: strin
         onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && text.trim()) { e.preventDefault(); handleSubmit(); } }}
       />
       <div className="flex items-center gap-2 mt-2">
-        <select value={kind} onChange={e => setKind(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:border-green-500">
-          <option value="dispatch">Dispatch</option>
-          <option value="review">Review</option>
-          <option value="finance">Finance</option>
-        </select>
         <button
           onClick={handleSubmit}
           disabled={sending || !text.trim()}
