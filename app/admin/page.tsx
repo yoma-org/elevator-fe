@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 
@@ -60,6 +60,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
   "pc-review":    { label: "PC REVIEW",          bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   "comm-review":  { label: "COMMERCIAL REVIEW",  bg: "#ede9fe", text: "#5b21b6", dot: "#8b5cf6" },
   "invoice-ready":{ label: "INVOICE READY",      bg: "#cffafe", text: "#155e75", dot: "#06b6d4" },
+  closed:         { label: "CLOSED",             bg: "#d1fae5", text: "#065f46", dot: "#10b981" },
   // legacy aliases kept for existing DB records
   pending:        { label: "SUBMITTED",          bg: "#fff3cd", text: "#856404", dot: "#d97706" },
   "in-progress":  { label: "ACTIVE",             bg: "#fde8e8", text: "#9b1c1c", dot: "#ef4444" },
@@ -481,6 +482,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
                 <option value="pc-review">PC Review</option>
                 <option value="comm-review">Commercial Review</option>
                 <option value="invoice-ready">Invoice Ready</option>
+                <option value="closed">Closed</option>
               </select>
             )}
             <button onClick={onClose} className="text-white hover:text-gray-300 ml-1 p-1 rounded hover:bg-white/10 transition-colors">
@@ -665,7 +667,7 @@ function AdminDashboardInner() {
       if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
       const [ordersRes, statsRes] = await Promise.all([
         fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`),
-        fetch(`${API_BASE}/maintenance-reports/admin/stats`),
+        fetch(`${API_BASE}/maintenance-reports/admin/stats?${params}`),
       ]);
       setOrders(await ordersRes.json());
       setStats(await statsRes.json());
@@ -678,22 +680,25 @@ function AdminDashboardInner() {
 
   useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
 
-  const searchFiltered = searchQuery
-    ? orders.filter(o => o.id?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : orders;
-  const filteredByStats = statsFilter
-    ? searchFiltered.filter((o) => {
-        if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "cancelled";
-        if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
-        if (statsFilter === "projectsThisMonth") {
-          const now = new Date();
-          const d = new Date(o.arrivalDateTime);
-          return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
-        }
-        return true;
-      })
-    : searchFiltered;
-  const sortedOrders = [...filteredByStats].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const sortedOrders = useMemo(() => {
+    const searchFiltered = searchQuery
+      ? orders.filter(o => o.id?.toLowerCase().includes(searchQuery.toLowerCase()))
+      : orders;
+    const filteredByStats = statsFilter
+      ? searchFiltered.filter((o) => {
+          if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "closed" && o.status !== "cancelled";
+          if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
+          if (statsFilter === "projectsThisMonth") {
+            const now = new Date();
+            const d = new Date(o.arrivalDateTime);
+            return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+          }
+          return true;
+        })
+      : searchFiltered;
+    return [...filteredByStats].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [orders, searchQuery, statsFilter]);
+
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -730,6 +735,7 @@ function AdminDashboardInner() {
             <option value="pc-review">PC Review</option>
             <option value="comm-review">Commercial Review</option>
             <option value="invoice-ready">Invoice Ready</option>
+            <option value="closed">Closed</option>
           </select>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-700">

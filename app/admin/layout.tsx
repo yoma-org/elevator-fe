@@ -15,12 +15,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {/* Logo + title */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-white flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="6" fill="#fff" />
-                <rect x="4" y="4" width="10" height="24" rx="2" fill="#e74c3c" />
-                <rect x="18" y="4" width="10" height="10" rx="2" fill="#f39c12" />
-                <rect x="18" y="18" width="10" height="10" rx="2" fill="#3498db" />
-              </svg>
+              <img src="/logo.jpg" alt="Yoma Elevator" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="text-white font-bold text-lg tracking-wide leading-none">

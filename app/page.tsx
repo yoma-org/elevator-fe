@@ -102,6 +102,26 @@ const checklistByType: Record<string, ChecklistGroup[]> = {
   ],
 };
 
+const FORM_STYLES = `
+  @keyframes slideInFwd  { from{opacity:0;transform:translateX(22px)}  to{opacity:1;transform:translateX(0)} }
+  @keyframes slideInBwd  { from{opacity:0;transform:translateX(-22px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes bounceIn    { 0%{transform:scale(0)} 60%{transform:scale(1.18)} 100%{transform:scale(1)} }
+  @keyframes fadeUp      { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes checkPop    { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
+  @keyframes spinBtn     { to{transform:rotate(360deg)} }
+  .form-input:focus      { border-color:#1b3c7b !important; box-shadow:0 0 0 3px rgba(27,60,123,.13); outline:none; }
+  .form-input.error:focus{ border-color:#ef4444 !important; box-shadow:0 0 0 3px rgba(239,68,68,.13); }
+  .checklist-btn         { transition:background .15s,border-color .15s,box-shadow .15s; }
+  .checklist-btn.checked { background:linear-gradient(135deg,#f0fdf4,#dcfce7) !important; border-color:#16a34a !important; box-shadow:0 2px 8px rgba(22,163,74,.12); }
+  .nav-btn               { transition:opacity .15s,transform .12s,box-shadow .15s; }
+  .nav-btn:active        { transform:scale(.96) !important; }
+  .nav-btn:hover         { filter:brightness(1.06); }
+  .step-dot.completed    { background:#16a34a; border-color:#16a34a; box-shadow:0 2px 6px rgba(22,163,74,.3); }
+  .step-dot.active       { background:#1b3c7b; border-color:#1b3c7b; box-shadow:0 2px 8px rgba(27,60,123,.35); transform:scale(1.15); }
+  .success-icon          { animation:bounceIn .45s cubic-bezier(.22,.61,.36,1) both; }
+  .success-code          { animation:fadeUp .35s .2s ease both; }
+`;
+
 const MAX_PHOTO_COUNT = 5;
 const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -245,18 +265,21 @@ export default function Home() {
   }, [formData.equipmentType]);
 
   useEffect(() => {
-    const nextChecklist: Record<string, boolean> = {};
-    selectedChecklist.forEach((group, groupIndex) => {
-      group.items.forEach((_, itemIndex) => {
-        const key = `${groupIndex}-${itemIndex}`;
-        nextChecklist[key] = formData.checklistState[key] ?? false;
+    setFormData((prev) => {
+      const nextChecklist: Record<string, boolean> = {};
+      selectedChecklist.forEach((group, groupIndex) => {
+        group.items.forEach((_, itemIndex) => {
+          const key = `${groupIndex}-${itemIndex}`;
+          nextChecklist[key] = prev.checklistState[key] ?? false;
+        });
       });
-    });
 
-    setFormData((prev) => ({
-      ...prev,
-      checklistState: nextChecklist,
-    }));
+      const prevKeys = Object.keys(prev.checklistState).sort().join(",");
+      const nextKeys = Object.keys(nextChecklist).sort().join(",");
+      if (prevKeys === nextKeys) return prev;
+
+      return { ...prev, checklistState: nextChecklist };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.equipmentType, dynamicChecklist]);
 
@@ -347,7 +370,19 @@ export default function Home() {
     }
     setStepErrors(getStepErrors(step));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, checkedCount]);
+  }, [
+    step,
+    checkedCount,
+    formData.buildingId,
+    formData.equipmentType,
+    formData.equipmentId,
+    formData.arrivalDateTime,
+    formData.completionDate,
+    formData.completionTime,
+    formData.customerName,
+    formData.techSignature,
+    formData.customerSignature,
+  ]);
 
   const updateArrival = (date: string, time: string) => {
     if (!date && !time) {
@@ -798,26 +833,6 @@ export default function Home() {
       setLoading(false);
     }
   };
-
-  const FORM_STYLES = `
-    @keyframes slideInFwd  { from{opacity:0;transform:translateX(22px)}  to{opacity:1;transform:translateX(0)} }
-    @keyframes slideInBwd  { from{opacity:0;transform:translateX(-22px)} to{opacity:1;transform:translateX(0)} }
-    @keyframes bounceIn    { 0%{transform:scale(0)} 60%{transform:scale(1.18)} 100%{transform:scale(1)} }
-    @keyframes fadeUp      { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes checkPop    { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
-    @keyframes spinBtn     { to{transform:rotate(360deg)} }
-    .form-input:focus      { border-color:#1b3c7b !important; box-shadow:0 0 0 3px rgba(27,60,123,.13); outline:none; }
-    .form-input.error:focus{ border-color:#ef4444 !important; box-shadow:0 0 0 3px rgba(239,68,68,.13); }
-    .checklist-btn         { transition:background .15s,border-color .15s,box-shadow .15s; }
-    .checklist-btn.checked { background:linear-gradient(135deg,#f0fdf4,#dcfce7) !important; border-color:#16a34a !important; box-shadow:0 2px 8px rgba(22,163,74,.12); }
-    .nav-btn               { transition:opacity .15s,transform .12s,box-shadow .15s; }
-    .nav-btn:active        { transform:scale(.96) !important; }
-    .nav-btn:hover         { filter:brightness(1.06); }
-    .step-dot.completed    { background:#16a34a; border-color:#16a34a; box-shadow:0 2px 6px rgba(22,163,74,.3); }
-    .step-dot.active       { background:#1b3c7b; border-color:#1b3c7b; box-shadow:0 2px 8px rgba(27,60,123,.35); transform:scale(1.15); }
-    .success-icon          { animation:bounceIn .45s cubic-bezier(.22,.61,.36,1) both; }
-    .success-code          { animation:fadeUp .35s .2s ease both; }
-  `;
 
   return (
     <div className="min-h-screen bg-slate-100">
