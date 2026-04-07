@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import * as XLSX from "xlsx";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
@@ -36,6 +38,7 @@ interface WorkOrder {
 }
 
 interface WorkOrderDetail extends WorkOrder {
+  buildingId: string; equipmentId: string;
   checklistResults: { equipmentType: string | null; checkedCount: number; totalCount: number;
     categories: Array<{ category: string; items: Array<{ label: string; checked: boolean }> }> } | null;
   remarks: string | null;
@@ -132,16 +135,20 @@ function AnimatedNumber({ target }: { target: number }) {
 
 // ─── StatCard ──────────────────────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, unit, ok }: { icon: string; label: string; value: string | number; unit?: string; ok?: boolean; }) {
+function StatCard({ icon, label, value, unit, ok, active, onClick }: { icon: string; label: string; value: string | number; unit?: string; ok?: boolean; active?: boolean; onClick?: () => void; }) {
   const isNum = typeof value === "number";
   return (
-    <div className="flex-1 bg-white rounded-lg px-5 py-4 border border-gray-200 min-w-0 card-hover" style={{ animation: "slideUp .3s ease both" }}>
+    <div
+      className={`flex-1 bg-white rounded-lg px-5 py-4 border min-w-0 card-hover ${onClick ? "cursor-pointer" : ""}`}
+      style={{ animation: "slideUp .3s ease both", borderColor: active ? "#16a34a" : undefined, boxShadow: active ? "0 0 0 2px rgba(22,163,74,.25)" : undefined }}
+      onClick={onClick}
+    >
       <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
         <span>{icon}</span>
-        <span className="font-semibold uppercase tracking-wide">{label}</span>
+        <span className={`font-semibold uppercase tracking-wide ${active ? "text-green-700" : ""}`}>{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-3xl font-bold text-gray-800">
+        <span className={`text-3xl font-bold ${active ? "text-green-700" : "text-gray-800"}`}>
           {isNum ? <AnimatedNumber target={value as number} /> : value}
         </span>
         {unit && <span className="text-sm font-semibold text-gray-500 uppercase ml-1">{unit}</span>}
@@ -232,12 +239,14 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
       <div className="flex items-center gap-2 mt-2">
         <button
           onClick={onClick}
-          className="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all"
+          className="text-xs px-3.5 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
         >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.5C3 2.5 1 6 1 6s2 3.5 5 3.5S11 6 11 6s-2-3.5-5-3.5z" stroke="currentColor" strokeWidth="1.2"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/></svg>
           View Details
         </button>
         {order.status === "invoice-ready" && (
-          <button className="btn-green text-xs px-3 py-1.5 rounded text-white font-semibold" style={{ backgroundColor: "#1a7a4a" }}>
+          <button className="btn-green text-xs px-3.5 py-2 rounded-lg text-white font-semibold flex items-center gap-1.5 active:scale-95 shadow-sm" style={{ backgroundColor: "#1a7a4a" }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8.5V10h1.5L9.2 4.3 7.7 2.8 2 8.5zM10.3 3.2l-1.5-1.5.7-.7 1.5 1.5-.7.7z" fill="currentColor"/></svg>
             Generate MMPR
           </button>
         )}
@@ -340,13 +349,13 @@ function AddProjectModal({ onClose, onCreated }: { onClose: () => void; onCreate
           )}
 
           <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={submitting} className="btn-green flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60" style={{ backgroundColor: "#1a7a4a" }}>
+            <button type="submit" disabled={submitting} className="btn-green flex-1 py-3 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm active:scale-[.97] transition-all" style={{ backgroundColor: "#1a7a4a" }}>
               {submitting
                 ? <><svg width="14" height="14" viewBox="0 0 14 14" style={{ animation: "spinArc .7s linear infinite" }}><circle cx="7" cy="7" r="5" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2"/><path d="M7 2A5 5 0 0 1 12 7" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>Creating...</>
-                : "✓ Create CBS Call"
+                : <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>Create CBS Call</>
               }
             </button>
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors">Close</button>
+            <button type="button" onClick={onClose} className="px-5 py-3 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 active:scale-[.97] transition-all">Cancel</button>
           </div>
         </form>
       </div>
@@ -380,19 +389,63 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 // ─── DetailModal ───────────────────────────────────────────────────────────────
 
-function DetailModal({ code, onClose, onStatusChange, onToast }: {
+function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }: {
   code: string; onClose: () => void;
   onStatusChange: (code: string, status: string) => void;
   onToast: (msg: string, kind: "success" | "error") => void;
+  onDetailUpdated?: () => void;
 }) {
   const [detail, setDetail] = useState<WorkOrderDetail | null>(null);
   const [tab, setTab] = useState<"info" | "notes">("info");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
+  const [editEquipmentId, setEditEquipmentId] = useState("");
+
+  const editableStatuses = ["submitted", "pc-review", "comm-review", "pending", "completed", "commercial-review"];
+  const isEditable = detail ? editableStatuses.includes(detail.status) : false;
 
   useEffect(() => {
     setDetail(null);
+    setEditing(false);
     fetch(`${API_BASE}/maintenance-reports/admin/${code}`).then(r => r.json()).then(setDetail).catch(console.error);
   }, [code]);
+
+  function startEditing() {
+    if (!detail) return;
+    setEditEquipmentId(detail.equipmentId);
+    // Load equipment list for this building
+    fetch(`${API_BASE}/equipment/by-building?buildingId=${detail.buildingId}`)
+      .then(r => r.json())
+      .then(res => { const list = res?.data ?? res; setEquipmentList(Array.isArray(list) ? list : []); })
+      .catch(() => setEquipmentList([]));
+    setEditing(true);
+  }
+
+  const selectedEquipment = equipmentList.find(e => e.id === editEquipmentId);
+  const hasChanges = detail && editEquipmentId !== detail.equipmentId;
+
+  async function handleSaveEdit() {
+    if (!hasChanges) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ equipmentId: editEquipmentId }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      // Refresh detail from server
+      const updated = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`).then(r => r.json());
+      setDetail(updated);
+      setEditing(false);
+      onToast("Equipment updated successfully", "success");
+      onDetailUpdated?.();
+    } catch {
+      onToast("Failed to update details", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleStatusChange(status: string) {
     setSaving(true);
@@ -400,6 +453,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
       await fetch(`${API_BASE}/maintenance-reports/admin/${code}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
       onStatusChange(code, status);
       if (detail) setDetail({ ...detail, status });
+      setEditing(false);
       onToast(`Status updated to ${getStatusCfg(status).label}`, "success");
     } catch {
       onToast("Failed to update status", "error");
@@ -407,6 +461,8 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
       setSaving(false);
     }
   }
+
+  const editInputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-green-600 focus:ring-2 focus:ring-green-100 resize-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay-fade" style={{ backgroundColor: "rgba(0,0,0,0.45)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -467,8 +523,54 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
                 <InfoRow label="Response Time" value="45 minutes" />
                 <InfoRow label="Work Duration" value="2.3 hours" />
               </Section>
+
+              {editing && (
+                <>
+                  <Section title="Edit Equipment">
+                    <div className="space-y-3">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Original</p>
+                        <p className="text-sm text-gray-700">{detail.equipmentType} — {detail.equipmentCode}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Equipment (Lift No.) <span className="text-red-500">*</span></label>
+                        {equipmentList.length === 0 ? (
+                          <div className="skeleton h-10 w-full" />
+                        ) : (
+                          <select value={editEquipmentId} onChange={e => setEditEquipmentId(e.target.value)} className={editInputCls + " bg-white"}>
+                            {equipmentList.map(eq => (
+                              <option key={eq.id} value={eq.id}>{eq.equipmentType} — {eq.equipmentCode}{eq.location ? ` (${eq.location})` : ""}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      {selectedEquipment && hasChanges && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-amber-600 uppercase mb-1">Changed to</p>
+                          <p className="text-sm text-amber-800">{selectedEquipment.equipmentType} — {selectedEquipment.equipmentCode}</p>
+                        </div>
+                      )}
+                    </div>
+                  </Section>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={handleSaveEdit} disabled={saving || !hasChanges} className="btn-green px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "#1a7a4a" }}>
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <button onClick={() => setEditing(false)} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
+                  </div>
+                </>
+              )}
+
               {detail.findings && <Section title="Issue Description"><p className="text-sm text-gray-700 leading-relaxed">{detail.findings}</p></Section>}
               {detail.workPerformed && <Section title="Action Taken"><p className="text-sm text-gray-700 leading-relaxed">{detail.workPerformed}</p></Section>}
+              {detail.remarks && <Section title="Remarks"><p className="text-sm text-gray-700 leading-relaxed">{detail.remarks}</p></Section>}
+              {!editing && isEditable && (
+                <button onClick={startEditing} className="btn-green px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ backgroundColor: "#1a7a4a" }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8.5V10h1.5L9.2 4.3 7.7 2.8 2 8.5zM10.3 3.2l-1.5-1.5.7-.7 1.5 1.5-.7.7z" fill="currentColor"/></svg>
+                  Edit Equipment
+                </button>
+              )}
+
               {detail.partsUsed && detail.partsUsed.length > 0 && (
                 <Section title="Parts Replaced">
                   <ul className="space-y-1">{detail.partsUsed.map((p,i) => <li key={i} className="text-sm text-gray-700">{p.name} &times; {p.quantity}</li>)}</ul>
@@ -494,7 +596,6 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
                   ))}
                 </Section>
               )}
-              {detail.remarks && <Section title="Remarks"><p className="text-sm text-gray-700 leading-relaxed">{detail.remarks}</p></Section>}
             </div>
           ) : (
             <div className="space-y-3" style={{ animation: "fadeIn .2s ease" }}>
@@ -522,6 +623,17 @@ function DetailModal({ code, onClose, onStatusChange, onToast }: {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
+  return (
+    <Suspense>
+      <AdminDashboardInner />
+    </Suspense>
+  );
+}
+
+function AdminDashboardInner() {
+  const urlSearchParams = useSearchParams();
+  const initialSearch = urlSearchParams.get("search") ?? "";
+
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -533,6 +645,10 @@ export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [statsFilter, setStatsFilter] = useState<"myQueue" | "projectsThisMonth" | "activeJobs" | null>(null);
 
   function addToast(text: string, kind: "success" | "error" = "success") {
     const id = ++toastId.current;
@@ -560,7 +676,26 @@ export default function AdminDashboard() {
     }
   }, [fromDate, toDate, statusFilter]);
 
-  useEffect(() => { void fetchData(); }, [fetchData]);
+  useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
+
+  const searchFiltered = searchQuery
+    ? orders.filter(o => o.id?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : orders;
+  const filteredByStats = statsFilter
+    ? searchFiltered.filter((o) => {
+        if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "cancelled";
+        if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
+        if (statsFilter === "projectsThisMonth") {
+          const now = new Date();
+          const d = new Date(o.arrivalDateTime);
+          return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+        }
+        return true;
+      })
+    : searchFiltered;
+  const sortedOrders = [...filteredByStats].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
+  const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   function handleStatusChange(code: string, status: string) {
     setOrders(p => p.map(o => o.id === code ? { ...o, status } : o));
@@ -597,9 +732,20 @@ export default function AdminDashboard() {
             <option value="invoice-ready">Invoice Ready</option>
           </select>
         </div>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span className="text-gray-400">🔍</span>
+          <input
+            type="text"
+            placeholder="Search report code..."
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+            className={`${inputCls} w-44`}
+          />
+        </div>
         <div className="ml-auto">
-          <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-4 py-2 rounded text-white" style={{ backgroundColor: "#1a7a4a" }}>
-            + Add Project
+          <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-5 py-2.5 rounded-lg text-white flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            Add Project
           </button>
         </div>
       </div>
@@ -607,24 +753,61 @@ export default function AdminDashboard() {
       {/* Finance export row */}
       <div className="mb-3 flex items-center gap-2 text-sm text-gray-600">
         <span className="font-medium">Finance Report Export:</span>
-        <button className="btn-green inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#e67e22", color: "#fff" }}>
-          ↓ Download Finance Report (CSV)
+        <button
+          disabled={orders.length === 0}
+          onClick={() => {
+            const rows = orders.map((o) => ({
+              "Report Code": o.id ?? "",
+              "Building": o.building ?? "",
+              "Equipment Code": o.equipmentCode ?? "",
+              "Equipment Type": o.equipmentType ?? "",
+              "Status": getStatusCfg(o.status).label,
+              "Maintenance Type": o.maintenanceType ?? "",
+              "Technician": o.technicianName ?? "",
+              "Arrival Date": o.arrivalDateTime ? fmtDate(o.arrivalDateTime) : "",
+              "Arrival Time": o.arrivalDateTime ? fmtTime(o.arrivalDateTime) : "",
+              "Priority": o.priority ?? "",
+              "Findings": o.findings ?? "",
+              "Work Performed": o.workPerformed ?? "",
+              "Parts Used": o.partsUsed?.map((p: { name: string; quantity: number }) => `${p.name} x${p.quantity}`).join(", ") ?? "",
+              "Submitted At": o.submittedAt ? fmtDate(o.submittedAt) : "",
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Work Orders");
+            ws["!cols"] = Object.keys(rows[0] ?? {}).map(() => ({ wch: 20 }));
+            XLSX.writeFile(wb, `Finance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          }}
+          className="btn-green inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg disabled:opacity-50 shadow-sm active:scale-95 transition-all"
+          style={{ backgroundColor: "#e67e22", color: "#fff" }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6.5L6.5 9l3-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          Export to Excel
         </button>
       </div>
 
       {/* Stats row */}
       <div className="flex gap-3 mb-4 flex-wrap">
-        <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} />
-        <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} />
-        <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} />
+        <StatCard icon="📋" label="My Queue"            value={stats?.myQueue ?? 0} active={statsFilter === "myQueue"} onClick={() => { setStatsFilter(f => f === "myQueue" ? null : "myQueue"); setCurrentPage(1); }} />
+        <StatCard icon="📅" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} active={statsFilter === "projectsThisMonth"} onClick={() => { setStatsFilter(f => f === "projectsThisMonth" ? null : "projectsThisMonth"); setCurrentPage(1); }} />
+        <StatCard icon="⚡" label="Active Jobs"         value={stats?.activeJobs ?? 0} active={statsFilter === "activeJobs"} onClick={() => { setStatsFilter(f => f === "activeJobs" ? null : "activeJobs"); setCurrentPage(1); }} />
         <StatCard icon="🕐" label="Avg Response Time"   value={stats?.avgResponseTimeMin ?? 45} unit="MIN" ok={true} />
         <StatCard icon="⏱" label="Avg Work Duration"   value={stats?.avgWorkDurationHrs ?? 2.3} unit="HRS" ok={true} />
       </div>
 
       {/* Work orders header */}
       <div className="rounded-t-lg px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "#1a3a2a" }}>
-        <h2 className="text-white font-bold text-sm uppercase tracking-widest">All Work Orders</h2>
-        {!loading && <span className="text-green-300 text-xs">{orders.length} records</span>}
+        <h2 className="text-white font-bold text-sm uppercase tracking-widest">
+          {statsFilter === "myQueue" ? "My Queue" : statsFilter === "projectsThisMonth" ? "Projects This Month" : statsFilter === "activeJobs" ? "Active Jobs" : "All Work Orders"}
+        </h2>
+        {!loading && (
+          <div className="flex items-center gap-2">
+            <span className="text-green-300 text-xs">{sortedOrders.length} records</span>
+            {statsFilter && (
+              <button onClick={() => { setStatsFilter(null); setCurrentPage(1); }} className="text-xs text-green-200 hover:text-white transition-colors underline">Clear</button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Work orders list */}
@@ -639,17 +822,67 @@ export default function AdminDashboard() {
           <div className="text-5xl mb-4">📋</div>
           <p className="text-gray-500 font-medium">No work orders found</p>
           <p className="text-gray-400 text-sm mt-1">Try adjusting the filters or create a new CBS Call.</p>
-          <button onClick={() => setShowAddProject(true)} className="btn-green mt-4 text-sm font-semibold px-4 py-2 rounded text-white inline-block" style={{ backgroundColor: "#1a7a4a" }}>
-            + Add Project
+          <button onClick={() => setShowAddProject(true)} className="btn-green mt-4 text-sm font-semibold px-5 py-2.5 rounded-lg text-white inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            Add Project
           </button>
         </div>
       ) : (
         <div className="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {orders.map((order, i) => (
+            {paginatedOrders.map((order, i) => (
               <WorkOrderCard key={order.id ?? order.createdAt} order={order} index={i} onClick={() => order.id && setSelectedCode(order.id)} />
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <span className="text-xs text-gray-500">
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, orders.length)} of {orders.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  ‹ Prev
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .reduce<(number | "ellipsis")[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("ellipsis");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === "ellipsis" ? (
+                      <span key={`e${idx}`} className="px-1.5 text-xs text-gray-400">…</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setCurrentPage(item)}
+                        className={`min-w-[30px] py-1.5 text-xs rounded border transition-all ${
+                          currentPage === item
+                            ? "bg-green-700 text-white border-green-700 font-bold"
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  Next ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -660,6 +893,7 @@ export default function AdminDashboard() {
           onClose={() => setSelectedCode(null)}
           onStatusChange={handleStatusChange}
           onToast={addToast}
+          onDetailUpdated={fetchData}
         />
       )}
 
