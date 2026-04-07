@@ -922,133 +922,121 @@ export default function Home() {
 
           {step === 1 && (
             <div className="space-y-5">
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Building Name <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                    stepErrors.buildingId ? "error border-red-500 bg-red-50" : "border-slate-300"
-                  }`}
-                  value={formData.buildingId}
-                  onChange={(event) => updateField("buildingId", event.target.value)}
-                >
-                  <option value="">Select building...</option>
-                  {buildings.map((building) => (
-                    <option key={building.id} value={building.id}>
-                      {building.name}
-                    </option>
-                  ))}
-                </select>
-                {stepErrors.buildingId && (
-                  <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.buildingId}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Equipment Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                    stepErrors.equipmentType ? "error border-red-500 bg-red-50" : "border-slate-300"
-                  }`}
-                  value={formData.equipmentType}
-                  onChange={(event) => {
-                    updateField("equipmentType", event.target.value);
-                    updateField("equipmentId", "");
-                  }}
-                >
-                  <option value="">Select equipment type...</option>
-                  {equipmentTypes.map((equipmentType) => (
-                    <option key={equipmentType} value={equipmentType}>
-                      {equipmentType}
-                    </option>
-                  ))}
-                </select>
-                {stepErrors.equipmentType && (
-                  <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentType}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Equipment ID <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all disabled:cursor-not-allowed disabled:bg-slate-100 ${
-                    stepErrors.equipmentId ? "error border-red-500 bg-red-50" : "border-slate-300"
-                  }`}
-                  value={formData.equipmentId}
-                  disabled={!formData.equipmentType}
-                  onChange={(event) => updateField("equipmentId", event.target.value)}
-                >
-                  <option value="">
-                    {formData.equipmentType ? "Select equipment..." : "Select equipment type first..."}
-                  </option>
-                  {equipmentList.map((equipment) => (
-                    <option key={equipment.id} value={equipment.id}>
-                      {equipment.equipmentCode}
-                    </option>
-                  ))}
-                </select>
-                {stepErrors.equipmentId && (
-                  <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentId}</p>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-[15px] font-semibold text-slate-900">
-                    Arrival Date &amp; Time <span className="text-red-500">*</span>
+              {/* Location section */}
+              <fieldset className="rounded-xl border-2 border-slate-200 bg-white p-4 space-y-4">
+                <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-400">Location</legend>
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><path d="M2 2h10v10H2z" stroke="currentColor" strokeWidth="1.2"/><path d="M5 1v2M9 1v2M2 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                    Building <span className="text-red-500">*</span>
                   </label>
-                  <button
-                    className="rounded-full bg-[#1b3c7b] px-4 py-1.5 text-sm font-bold text-white shadow-sm hover:bg-[#15306a] active:scale-95 transition-all flex items-center gap-1.5"
-                    type="button"
-                    onClick={() => {
-                      const now = getLocalDateTimeParts();
-                      updateArrival(now.date, now.time);
-                    }}
+                  <select
+                    className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
+                      stepErrors.buildingId ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                    }`}
+                    value={formData.buildingId}
+                    onChange={(event) => updateField("buildingId", event.target.value)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                    Now
-                  </button>
+                    <option value="">Select building...</option>
+                    {buildings.map((building) => (
+                      <option key={building.id} value={building.id}>{building.name}</option>
+                    ))}
+                  </select>
+                  {stepErrors.buildingId && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.buildingId}</p>}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                      stepErrors.arrivalDate ? "error border-red-500 bg-red-50" : "border-slate-300"
-                    }`}
-                    type="date"
-                    value={arrivalDate}
-                    onChange={(event) => updateArrival(event.target.value, arrivalTime)}
-                  />
-                  <input
-                    className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                      stepErrors.arrivalTime ? "error border-red-500 bg-red-50" : "border-slate-300"
-                    }`}
-                    type="time"
-                    value={arrivalTime}
-                    onChange={(event) => updateArrival(arrivalDate, event.target.value)}
-                  />
-                </div>
-                {(stepErrors.arrivalDate || stepErrors.arrivalTime) && (
-                  <p className="mt-1 text-xs font-medium text-red-600">
-                    {stepErrors.arrivalDate || stepErrors.arrivalTime}
-                  </p>
-                )}
-              </div>
 
-              <div>
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
-                  Technician Name
-                </label>
-                <input
-                  className="h-12 w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 text-base text-slate-500 cursor-not-allowed"
-                  value={formData.technicianName}
-                  readOnly
-                />
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><rect x="3" y="2" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5h3M5.5 7.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      Equipment Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
+                        stepErrors.equipmentType ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                      }`}
+                      value={formData.equipmentType}
+                      onChange={(event) => { updateField("equipmentType", event.target.value); updateField("equipmentId", ""); }}
+                    >
+                      <option value="">Select type...</option>
+                      {equipmentTypes.map((et) => <option key={et} value={et}>{et}</option>)}
+                    </select>
+                    {stepErrors.equipmentType && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentType}</p>}
+                  </div>
+                  <div>
+                    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/><path d="M7 4.5v5M4.5 7h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      Equipment ID <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                        stepErrors.equipmentId ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                      }`}
+                      value={formData.equipmentId}
+                      disabled={!formData.equipmentType}
+                      onChange={(event) => updateField("equipmentId", event.target.value)}
+                    >
+                      <option value="">{formData.equipmentType ? "Select..." : "Select type first"}</option>
+                      {equipmentList.map((eq) => <option key={eq.id} value={eq.id}>{eq.equipmentCode}</option>)}
+                    </select>
+                    {stepErrors.equipmentId && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentId}</p>}
+                  </div>
+                </div>
+              </fieldset>
+
+              {/* Visit details section */}
+              <fieldset className="rounded-xl border-2 border-slate-200 bg-white p-4 space-y-4">
+                <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-400">Visit Details</legend>
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/><path d="M7 4v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      Arrival Date & Time <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      className="rounded-full bg-[#1b3c7b] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#15306a] active:scale-95 transition-all flex items-center gap-1"
+                      type="button"
+                      onClick={() => { const now = getLocalDateTimeParts(); updateArrival(now.date, now.time); }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      Now
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
+                        stepErrors.arrivalDate ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                      }`}
+                      type="date"
+                      value={arrivalDate}
+                      onChange={(event) => updateArrival(event.target.value, arrivalTime)}
+                    />
+                    <input
+                      className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
+                        stepErrors.arrivalTime ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                      }`}
+                      type="time"
+                      value={arrivalTime}
+                      onChange={(event) => updateArrival(arrivalDate, event.target.value)}
+                    />
+                  </div>
+                  {(stepErrors.arrivalDate || stepErrors.arrivalTime) && (
+                    <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.arrivalDate || stepErrors.arrivalTime}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><circle cx="7" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/><path d="M2 12c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.2"/></svg>
+                    Technician
+                  </label>
+                  <input
+                    className="h-12 w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 text-base text-slate-500 cursor-not-allowed"
+                    value={formData.technicianName}
+                    readOnly
+                  />
+                </div>
+              </fieldset>
             </div>
           )}
 
@@ -1109,31 +1097,37 @@ export default function Home() {
                 </div>
               ))}
 
-              <div className="rounded-lg border-2 border-slate-300 bg-slate-50 p-3 text-sm">
+              <div className="sticky bottom-0 rounded-xl border-2 border-slate-200 bg-white p-3 shadow-sm">
                 {stepErrors.checklist && (
-                  <p className="mb-2 rounded-md bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                  <p className="mb-2 rounded-lg bg-red-50 border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700">
                     {stepErrors.checklist}
                   </p>
                 )}
-                Assessed: {checkedCount}/{totalCount}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${totalCount > 0 ? (checkedCount / totalCount) * 100 : 0}%` }} />
+                  </div>
+                  <span className="text-sm font-bold text-slate-700 whitespace-nowrap">{checkedCount}/{totalCount}</span>
+                </div>
               </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-5">
-              <div className="rounded-lg border-2 border-slate-300 bg-white p-3">
-                <label className="mb-2 block text-[15px] font-semibold text-slate-900">
+              <div className="rounded-xl border-2 border-slate-200 bg-white p-4">
+                <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-400"><rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/><circle cx="5.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 11l3.5-3 3 2.5 2.5-2 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   Photos
+                  <span className="ml-auto text-xs font-normal text-slate-400">{formData.photos.length}/{MAX_PHOTO_COUNT}</span>
                 </label>
                 <label
                   htmlFor="photo-upload"
-                  className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center hover:border-[#f59e0b] hover:bg-amber-50"
+                  className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100 transition-all"
                 >
-                  <span className="text-sm font-semibold text-slate-700">Tap to upload photos</span>
-                  <span className="mt-1 text-xs text-slate-500">
-                    PNG, JPG, WEBP - up to {MAX_PHOTO_COUNT} images, max 5MB each
-                  </span>
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-slate-400 mb-2"><path d="M14 18V8M10 12l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 20v2a2 2 0 002 2h16a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                  <span className="text-sm font-medium text-slate-600">Tap to upload photos</span>
+                  <span className="mt-1 text-xs text-slate-400">PNG, JPG, WEBP - max 5MB each</span>
                 </label>
                 <input
                   id="photo-upload"
@@ -1283,28 +1277,30 @@ export default function Home() {
 
           {step === 5 && (
             <div className="space-y-4">
-              <section className="rounded-xl border-2 border-slate-300 bg-white p-4">
-                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
+              <section className="rounded-xl border-2 border-slate-200 bg-white p-4">
+                <h3 className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2h10v10H2z" stroke="currentColor" strokeWidth="1.2"/><path d="M5 1v2M9 1v2M2 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   Basic Information
                 </h3>
-                <dl className="space-y-1.5 text-sm">
-                  <div>Building: {buildings.find((item) => item.id === formData.buildingId)?.name || "-"}</div>
-                  <div>
-                    Equipment: {equipmentList.find((item) => item.id === formData.equipmentId)?.equipmentCode || "-"}
-                  </div>
-                  <div>Service Date: {arrivalDate || "-"}</div>
-                  <div>Arrival: {arrivalTime || "-"}</div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div><span className="text-slate-400 text-xs block">Building</span><span className="font-medium text-slate-800">{buildings.find((item) => item.id === formData.buildingId)?.name || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Equipment</span><span className="font-medium text-slate-800">{equipmentList.find((item) => item.id === formData.equipmentId)?.equipmentCode || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Service Date</span><span className="font-medium text-slate-800">{arrivalDate || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Arrival Time</span><span className="font-medium text-slate-800">{arrivalTime || "-"}</span></div>
                 </dl>
               </section>
 
-              <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
-                <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
+              <section className="rounded-xl border-2 border-slate-200 bg-white p-4">
+                <h3 className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   Service Summary
                 </h3>
-                <div>Checklist assessed: {checkedCount}/{totalCount}</div>
-                <div>Issues: {formData.issuesFound || "-"}</div>
-                <div>Parts replaced: {formData.partsReplaced}</div>
-                <div>Photos: {formData.photos.length}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div><span className="text-slate-400 text-xs block">Checklist</span><span className="font-medium text-slate-800">{checkedCount}/{totalCount} assessed</span></div>
+                  <div><span className="text-slate-400 text-xs block">Parts Replaced</span><span className="font-medium text-slate-800 capitalize">{formData.partsReplaced}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Photos</span><span className="font-medium text-slate-800">{formData.photos.length} uploaded</span></div>
+                  <div><span className="text-slate-400 text-xs block">Issues</span><span className="font-medium text-slate-800 line-clamp-1">{formData.issuesFound || "None reported"}</span></div>
+                </div>
                 <div>Customer: {formData.customerName || "-"}</div>
                 <div>Initial Ticket Status: pending</div>
               </section>
