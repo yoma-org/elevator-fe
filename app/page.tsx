@@ -145,7 +145,7 @@ const createInitialFormData = () => ({
   maintenanceType: "Scheduled/Preventive Maintenance",
   arrivalDateTime: getLocalDateTimeParts().dateTime,
   technicianName: "Ko Aung Mya Oo",
-  checklistState: {} as Record<string, boolean>,
+  checklistState: {} as Record<string, string>,
   issuesFound: "",
   partsReplaced: "no",
   parts: [{ name: "", quantity: "1" }] as PartItem[],
@@ -267,11 +267,11 @@ export default function Home() {
 
   useEffect(() => {
     setFormData((prev) => {
-      const nextChecklist: Record<string, boolean> = {};
+      const nextChecklist: Record<string, string> = {};
       selectedChecklist.forEach((group, groupIndex) => {
         group.items.forEach((_, itemIndex) => {
           const key = `${groupIndex}-${itemIndex}`;
-          nextChecklist[key] = prev.checklistState[key] ?? false;
+          nextChecklist[key] = prev.checklistState[key] ?? "";
         });
       });
 
@@ -326,7 +326,7 @@ export default function Home() {
   }, [formData.buildingId, formData.equipmentType]);
 
   const checkedCount = useMemo(
-    () => Object.values(formData.checklistState).filter(Boolean).length,
+    () => Object.values(formData.checklistState).filter((v) => v !== "").length,
     [formData.checklistState],
   );
 
@@ -351,7 +351,7 @@ export default function Home() {
     }
 
     if (currentStep === 2) {
-      if (checkedCount < 1) errors.checklist = "Please check at least one checklist item";
+      if (checkedCount < 1) errors.checklist = "Please set status for at least one checklist item";
     }
 
     if (currentStep === 6) {
@@ -404,12 +404,20 @@ export default function Home() {
     }));
   };
 
-  const toggleChecklist = (key: string) => {
+  const CHECKLIST_STATUSES = ["good", "adjusted", "repair", "na"] as const;
+  const CHECKLIST_STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    good:     { label: "Good",             color: "#166534", bg: "#dcfce7", border: "#16a34a" },
+    adjusted: { label: "Adjusted",         color: "#854d0e", bg: "#fef9c3", border: "#ca8a04" },
+    repair:   { label: "Repair / Replace", color: "#991b1b", bg: "#fee2e2", border: "#ef4444" },
+    na:       { label: "N/A",              color: "#475569", bg: "#f1f5f9", border: "#94a3b8" },
+  };
+
+  const setChecklistStatus = (key: string, status: string) => {
     setFormData((prev) => ({
       ...prev,
       checklistState: {
         ...prev.checklistState,
-        [key]: !prev.checklistState[key],
+        [key]: prev.checklistState[key] === status ? "" : status,
       },
     }));
   };
@@ -780,7 +788,8 @@ export default function Home() {
           category: group.category,
           items: group.items.map((item, itemIndex) => ({
             label: item,
-            checked: Boolean(formData.checklistState[`${groupIndex}-${itemIndex}`]),
+            status: formData.checklistState[`${groupIndex}-${itemIndex}`] || "",
+            checked: formData.checklistState[`${groupIndex}-${itemIndex}`] !== "",
           })),
         })),
       };
@@ -792,7 +801,7 @@ export default function Home() {
         arrivalDateTime: new Date(formData.arrivalDateTime).toISOString(),
         technicianName: formData.technicianName,
         checklistResults,
-        findings: `${checkedCount}/${totalCount} checklist items checked`,
+        findings: `${checkedCount}/${totalCount} checklist items assessed`,
         workPerformed: formData.partsReplaced === "yes" ? "Parts replaced" : "Routine service",
         partsUsed:
           formData.partsReplaced === "yes"
@@ -1068,29 +1077,31 @@ export default function Home() {
                   </div>
                   {group.items.map((item, itemIndex) => {
                     const key = `${groupIndex}-${itemIndex}`;
-                    const checked = formData.checklistState[key];
+                    const currentStatus = formData.checklistState[key] || "";
                     return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => toggleChecklist(key)}
-                        className={`checklist-btn mb-2.5 flex w-full items-center rounded-xl border-2 bg-white p-4 text-left ${checked ? "checked" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
-                      >
-                        <div
-                          className="mr-3.5 flex h-7 w-7 min-w-[1.75rem] items-center justify-center rounded-lg border-2 transition-all"
-                          style={checked
-                            ? { borderColor: "#16a34a", background: "#16a34a", color: "#fff" }
-                            : { borderColor: "#cbd5e1", background: "#f8fafc" }
-                          }
-                        >
-                          {checked && (
-                            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ animation: "checkPop .2s ease" }}>
-                              <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
+                      <div key={item} className="mb-3 rounded-xl border-2 border-slate-200 bg-white p-3">
+                        <div className="mb-2 text-[15px] font-medium text-slate-800">{item}</div>
+                        <div className="flex flex-wrap gap-2">
+                          {CHECKLIST_STATUSES.map((status) => {
+                            const cfg = CHECKLIST_STATUS_LABELS[status];
+                            const isSelected = currentStatus === status;
+                            return (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => setChecklistStatus(key, status)}
+                                className="rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-all"
+                                style={isSelected
+                                  ? { borderColor: cfg.border, background: cfg.bg, color: cfg.color }
+                                  : { borderColor: "#e2e8f0", background: "#fff", color: "#64748b" }
+                                }
+                              >
+                                {cfg.label}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <span className={`text-[15px] font-medium transition-colors ${checked ? "text-green-800" : "text-slate-800"}`}>{item}</span>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1102,7 +1113,7 @@ export default function Home() {
                     {stepErrors.checklist}
                   </p>
                 )}
-                Checked: {checkedCount}/{totalCount}
+                Assessed: {checkedCount}/{totalCount}
               </div>
             </div>
           )}
@@ -1282,7 +1293,7 @@ export default function Home() {
                 <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
                   Service Summary
                 </h3>
-                <div>Checklist passed: {checkedCount}/{totalCount}</div>
+                <div>Checklist assessed: {checkedCount}/{totalCount}</div>
                 <div>Issues: {formData.issuesFound || "-"}</div>
                 <div>Parts replaced: {formData.partsReplaced}</div>
                 <div>Photos: {formData.photos.length}</div>
