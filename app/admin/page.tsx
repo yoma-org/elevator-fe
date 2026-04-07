@@ -473,6 +473,59 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ─── NoteForm ─────────────────────────────────────────────────────────────────
+
+function NoteForm({ code, onAdded }: { code: string; onAdded: (note: { id: string; at: string; author: string; kind: string; text: string }) => void }) {
+  const [text, setText] = useState("");
+  const [kind, setKind] = useState("dispatch");
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!text.trim()) return;
+    setSending(true);
+    try {
+      await fetch(`${API_BASE}/maintenance-reports/admin/${code}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.trim(), kind, author: "ADMIN" }),
+      });
+      const newNote = { id: crypto.randomUUID(), at: new Date().toISOString(), author: "ADMIN", kind, text: text.trim() };
+      onAdded(newNote);
+      setText("");
+    } catch { /* ignore */ } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+      <textarea
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none resize-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all"
+        rows={2}
+        placeholder="Add a note..."
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && text.trim()) { e.preventDefault(); handleSubmit(); } }}
+      />
+      <div className="flex items-center gap-2 mt-2">
+        <select value={kind} onChange={e => setKind(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:border-green-500">
+          <option value="dispatch">Dispatch</option>
+          <option value="review">Review</option>
+          <option value="finance">Finance</option>
+        </select>
+        <button
+          onClick={handleSubmit}
+          disabled={sending || !text.trim()}
+          className="ml-auto text-xs font-semibold px-4 py-1.5 rounded-lg text-white disabled:opacity-50 transition-all active:scale-95"
+          style={{ backgroundColor: "#1a7a4a" }}
+        >
+          {sending ? "Sending..." : "Add Note"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── DetailModal ───────────────────────────────────────────────────────────────
 
 function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }: {
@@ -738,35 +791,47 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
               )}
             </div>
           ) : (
-            <div className="space-y-0" style={{ animation: "fadeIn .2s ease" }}>
-              {!detail.internalNotes || detail.internalNotes.length === 0
-                ? (
-                  <div className="text-center py-12">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
-                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-400"><path d="M4 4h12v12H4z" stroke="currentColor" strokeWidth="1.3"/><path d="M7 8h6M7 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                    </div>
-                    <p className="text-sm text-gray-400">No activity yet.</p>
-                  </div>
-                )
-                : [...detail.internalNotes].sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime()).map((note, i, arr) => (
-                  <div key={note.id} className="flex gap-3 group">
-                    {/* Timeline line */}
-                    <div className="flex flex-col items-center flex-shrink-0">
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: note.kind === "system" ? "#86efac" : "#93c5fd" }} />
-                      {i < arr.length - 1 && <div className="w-0.5 flex-1 bg-gray-100 my-1" />}
-                    </div>
-                    {/* Content */}
-                    <div className="pb-4 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-gray-700">{note.author}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: note.kind === "system" ? "#f0fdf4" : "#eff6ff", color: note.kind === "system" ? "#166534" : "#1e40af" }}>{note.kind}</span>
-                        <span className="text-[10px] text-gray-400 ml-auto">{fmtDate(note.at)} {fmtTime(note.at)}</span>
+            <div style={{ animation: "fadeIn .2s ease" }}>
+              {/* Add note form */}
+              <NoteForm code={code} onAdded={(note) => {
+                setDetail(prev => prev ? { ...prev, internalNotes: [...(prev.internalNotes ?? []), note] } : prev);
+                onToast("Note added", "success");
+              }} />
+
+              {/* Notes timeline */}
+              <div className="space-y-0 mt-4">
+                {!detail.internalNotes || detail.internalNotes.length === 0
+                  ? (
+                    <div className="text-center py-12">
+                      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-400"><path d="M4 4h12v12H4z" stroke="currentColor" strokeWidth="1.3"/><path d="M7 8h6M7 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                       </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">{note.text}</p>
+                      <p className="text-sm text-gray-400">No activity yet.</p>
                     </div>
-                  </div>
-                ))
-              }
+                  )
+                  : [...detail.internalNotes].sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime()).map((note, i, arr) => (
+                    <div key={note.id} className="flex gap-3 group">
+                      {/* Timeline line */}
+                      <div className="flex flex-col items-center flex-shrink-0">
+                        <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: note.kind === "system" ? "#86efac" : note.kind === "dispatch" ? "#93c5fd" : note.kind === "review" ? "#c4b5fd" : "#fcd34d" }} />
+                        {i < arr.length - 1 && <div className="w-0.5 flex-1 bg-gray-100 my-1" />}
+                      </div>
+                      {/* Content */}
+                      <div className="pb-4 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-gray-700">{note.author}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{
+                            backgroundColor: note.kind === "system" ? "#f0fdf4" : note.kind === "dispatch" ? "#eff6ff" : note.kind === "review" ? "#f5f3ff" : "#fffbeb",
+                            color: note.kind === "system" ? "#166534" : note.kind === "dispatch" ? "#1e40af" : note.kind === "review" ? "#5b21b6" : "#92400e",
+                          }}>{note.kind}</span>
+                          <span className="text-[10px] text-gray-400 ml-auto">{fmtDate(note.at)} {fmtTime(note.at)}</span>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{note.text}</p>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
             </div>
           )}
         </div>
