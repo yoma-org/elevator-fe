@@ -650,6 +650,9 @@ function AdminDashboardInner() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [buildingFilter, setBuildingFilter] = useState("all");
+  const [projectNameFilter, setProjectNameFilter] = useState("");
+  const [partsFilter, setPartsFilter] = useState("");
   const [statsFilter, setStatsFilter] = useState<"myQueue" | "projectsThisMonth" | "activeJobs" | null>(null);
 
   function addToast(text: string, kind: "success" | "error" = "success") {
@@ -680,24 +683,47 @@ function AdminDashboardInner() {
 
   useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
 
+  const uniqueBuildings = useMemo(() => [...new Set(orders.map(o => o.building).filter(Boolean))].sort(), [orders]);
+  const uniqueProjectNames = useMemo(() => [...new Set(orders.map(o => o.maintenanceType).filter(Boolean))].sort(), [orders]);
+  const uniqueParts = useMemo(() => {
+    const names = new Set<string>();
+    orders.forEach(o => o.partsUsed?.forEach(p => { if (p.name.trim()) names.add(p.name.trim()); }));
+    return [...names].sort();
+  }, [orders]);
+  const uniqueReportCodes = useMemo(() => orders.map(o => o.id).filter(Boolean).sort(), [orders]);
+
   const sortedOrders = useMemo(() => {
-    const searchFiltered = searchQuery
-      ? orders.filter(o => o.id?.toLowerCase().includes(searchQuery.toLowerCase()))
-      : orders;
-    const filteredByStats = statsFilter
-      ? searchFiltered.filter((o) => {
-          if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "closed" && o.status !== "cancelled";
-          if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
-          if (statsFilter === "projectsThisMonth") {
-            const now = new Date();
-            const d = new Date(o.arrivalDateTime);
-            return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
-          }
-          return true;
-        })
-      : searchFiltered;
-    return [...filteredByStats].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [orders, searchQuery, statsFilter]);
+    let filtered = orders;
+
+    if (searchQuery) filtered = filtered.filter(o => o.id?.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (buildingFilter && buildingFilter !== "all") {
+      const q = buildingFilter.toLowerCase();
+      filtered = filtered.filter(o => o.building?.toLowerCase().includes(q));
+    }
+    if (projectNameFilter) {
+      const q = projectNameFilter.toLowerCase();
+      filtered = filtered.filter(o => o.maintenanceType?.toLowerCase().includes(q) || o.id?.toLowerCase().includes(q));
+    }
+    if (partsFilter) {
+      const q = partsFilter.toLowerCase();
+      filtered = filtered.filter(o => o.partsUsed?.some(p => p.name.toLowerCase().includes(q)));
+    }
+
+    if (statsFilter) {
+      filtered = filtered.filter((o) => {
+        if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "closed" && o.status !== "cancelled";
+        if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
+        if (statsFilter === "projectsThisMonth") {
+          const now = new Date();
+          const d = new Date(o.arrivalDateTime);
+          return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+        }
+        return true;
+      });
+    }
+
+    return [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [orders, searchQuery, buildingFilter, projectNameFilter, partsFilter, statsFilter]);
 
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -739,14 +765,60 @@ function AdminDashboardInner() {
           </select>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span className="font-medium">Building:</span>
+          <input
+            type="text"
+            list="building-list"
+            placeholder="All Buildings"
+            value={buildingFilter === "all" ? "" : buildingFilter}
+            onChange={e => { setBuildingFilter(e.target.value || "all"); setCurrentPage(1); }}
+            className={`${inputCls} w-44`}
+          />
+          <datalist id="building-list">
+            {uniqueBuildings.map(b => <option key={b} value={b} />)}
+          </datalist>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
           <span className="text-gray-400">🔍</span>
           <input
             type="text"
-            placeholder="Search report code..."
+            list="project-name-list"
+            placeholder="Project name..."
+            value={projectNameFilter}
+            onChange={e => { setProjectNameFilter(e.target.value); setCurrentPage(1); }}
+            className={`${inputCls} w-36`}
+          />
+          <datalist id="project-name-list">
+            {uniqueProjectNames.map(n => <option key={n} value={n} />)}
+          </datalist>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span className="text-gray-400">🔧</span>
+          <input
+            type="text"
+            list="parts-list"
+            placeholder="Item / Parts..."
+            value={partsFilter}
+            onChange={e => { setPartsFilter(e.target.value); setCurrentPage(1); }}
+            className={`${inputCls} w-36`}
+          />
+          <datalist id="parts-list">
+            {uniqueParts.map(p => <option key={p} value={p} />)}
+          </datalist>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span className="text-gray-400">🔍</span>
+          <input
+            type="text"
+            list="report-code-list"
+            placeholder="Report code..."
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className={`${inputCls} w-44`}
+            className={`${inputCls} w-36`}
           />
+          <datalist id="report-code-list">
+            {uniqueReportCodes.map(c => <option key={c} value={c} />)}
+          </datalist>
         </div>
         <div className="ml-auto">
           <button onClick={() => setShowAddProject(true)} className="btn-green text-sm font-semibold px-5 py-2.5 rounded-lg text-white flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
