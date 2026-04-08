@@ -3,7 +3,11 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import BatchUploadModal from "../../components/BatchUploadModal";
+import { useAdminSession } from "../../lib/admin-session-context";
+import { can, visibleStatuses, NEXT_STATUS } from "../../lib/permissions";
 
 // ─── useDebounce hook ─────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay: number): T {
@@ -87,6 +91,165 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
   cancelled:      { label: "CANCELLED",          bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
 };
 function getStatusCfg(s: string) { return STATUS_CONFIG[s] ?? { label: s.toUpperCase(), bg: "#f3f4f6", text: "#374151", dot: "#9ca3af" }; }
+
+// ─── PDF Report Generator ─────────────────────────────────────────────────────
+
+function downloadReportPdf(d: WorkOrderDetail) {
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  let y = 15;
+
+  // Header
+  doc.setFillColor(26, 58, 42); // #1a3a2a
+  doc.rect(0, 0, pageW, 32, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("YECL MAINTENANCE SERVICE REPORT", 14, 14);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("Yoma Elevator Co., Ltd.", 14, 21);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(d.id ?? "", pageW - 14, 14, { align: "right" });
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(getStatusCfg(d.status).label, pageW - 14, 21, { align: "right" });
+
+  y = 40;
+  doc.setTextColor(0, 0, 0);
+
+  // ── Information table ──
+  const infoRows = [
+    ["Report Code", d.id ?? "—", "Status", getStatusCfg(d.status).label],
+    ["Building", d.building ?? "—", "Priority", d.priority ?? "—"],
+    ["Lift No.", d.equipmentCode ?? "—", "Equipment Type", d.equipmentType ?? "—"],
+    ["Maintenance Type", d.maintenanceType ?? "—", "Technician", d.technicianName ?? "—"],
+    ["Arrival Date", d.arrivalDateTime ? fmtDate(d.arrivalDateTime) : "—", "Arrival Time", d.arrivalDateTime ? fmtTime(d.arrivalDateTime) : "—"],
+    ["Assigned To", d.assignedTo ?? "—", "Submitted At", d.submittedAt ? fmtDate(d.submittedAt) : "—"],
+  ];
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Field", "Value", "Field", "Value"]],
+    body: infoRows,
+    theme: "grid",
+    headStyles: { fillColor: [26, 58, 42], textColor: 255, fontSize: 8, fontStyle: "bold" },
+    bodyStyles: { fontSize: 8 },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 35, textColor: [100, 100, 100] },
+      1: { cellWidth: 55 },
+      2: { fontStyle: "bold", cellWidth: 35, textColor: [100, 100, 100] },
+      3: { cellWidth: 55 },
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // ── Findings ──
+  if (d.findings) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(26, 58, 42);
+    doc.text("Issue Description / Findings", 14, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9);
+    const lines = doc.splitTextToSize(d.findings, pageW - 28);
+    doc.text(lines, 14, y);
+    y += lines.length * 4.5 + 4;
+  }
+
+  // ── Work Performed ──
+  if (d.workPerformed) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(26, 58, 42);
+    doc.text("Work Performed / Action Taken", 14, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9);
+    const lines = doc.splitTextToSize(d.workPerformed, pageW - 28);
+    doc.text(lines, 14, y);
+    y += lines.length * 4.5 + 4;
+  }
+
+  // ── Parts Used ──
+  if (d.partsUsed && d.partsUsed.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      head: [["Part Name", "Quantity"]],
+      body: d.partsUsed.map(p => [p.name, String(p.quantity)]),
+      theme: "grid",
+      headStyles: { fillColor: [26, 58, 42], textColor: 255, fontSize: 8, fontStyle: "bold" },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 30, halign: "center" } },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
+  // ── Checklist ──
+  if (d.checklistResults && d.checklistResults.categories.length > 0) {
+    // Check if we need a new page
+    if (y > 240) { doc.addPage(); y = 15; }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(26, 58, 42);
+    doc.text(`Checklist Results (${d.checklistResults.checkedCount}/${d.checklistResults.totalCount})`, 14, y);
+    y += 2;
+
+    const checkRows: string[][] = [];
+    d.checklistResults.categories.forEach(cat => {
+      cat.items.forEach(item => {
+        checkRows.push([cat.category, item.label, item.checked ? "Pass" : "—"]);
+      });
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Category", "Item", "Status"]],
+      body: checkRows,
+      theme: "grid",
+      headStyles: { fillColor: [26, 58, 42], textColor: 255, fontSize: 8, fontStyle: "bold" },
+      bodyStyles: { fontSize: 7.5 },
+      columnStyles: { 0: { cellWidth: 40 }, 2: { cellWidth: 20, halign: "center" } },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
+  // ── Remarks ──
+  if (d.remarks) {
+    if (y > 260) { doc.addPage(); y = 15; }
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(26, 58, 42);
+    doc.text("Remarks", 14, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9);
+    const lines = doc.splitTextToSize(d.remarks, pageW - 28);
+    doc.text(lines, 14, y);
+    y += lines.length * 4.5 + 4;
+  }
+
+  // ── Footer ──
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generated: ${new Date().toLocaleString()} | Page ${i}/${pageCount}`, pageW / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+  }
+
+  doc.save(`Report_${d.id ?? "unknown"}_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
 
 function fmtDate(iso: string) { if (!iso) return "-"; const d = new Date(iso); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; }
 function fmtTime(iso: string) { if (!iso) return "-"; const d = new Date(iso); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
@@ -343,7 +506,7 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
 
 // ─── AddProjectModal ───────────────────────────────────────────────────────────
 
-function AddProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: (msg: string) => void }) {
+function AddProjectModal({ onClose, onCreated, token }: { onClose: () => void; onCreated: (msg: string) => void; token?: string | null }) {
   const [buildings, setBuildings] = useState<BuildingItem[]>([]);
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [buildingId, setBuildingId] = useState("");
@@ -369,8 +532,10 @@ function AddProjectModal({ onClose, onCreated }: { onClose: () => void; onCreate
     if (!buildingId || !equipmentId || !calledPerson || !calledTime || !issue) { setError("Please fill in all required fields."); return; }
     setSubmitting(true);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/maintenance-reports/admin/cbs-call`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers,
         body: JSON.stringify({ buildingId, equipmentId, calledPerson, calledTime, issue }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d?.message ?? "Failed to create CBS Call"); }
@@ -475,20 +640,24 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 // ─── NoteForm ─────────────────────────────────────────────────────────────────
 
-function NoteForm({ code, onAdded }: { code: string; onAdded: (note: { id: string; at: string; author: string; kind: string; text: string }) => void }) {
+function NoteForm({ code, onAdded, token, authorName }: { code: string; onAdded: (note: { id: string; at: string; author: string; kind: string; text: string }) => void; token?: string | null; authorName?: string }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+
+  const author = authorName ?? "ADMIN";
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
     setSending(true);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       await fetch(`${API_BASE}/maintenance-reports/admin/${code}/notes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), kind: "dispatch", author: "ADMIN" }),
+        headers,
+        body: JSON.stringify({ text: text.trim(), kind: "dispatch", author }),
       });
-      const newNote = { id: crypto.randomUUID(), at: new Date().toISOString(), author: "ADMIN", kind: "dispatch", text: text.trim() };
+      const newNote = { id: crypto.randomUUID(), at: new Date().toISOString(), author, kind: "dispatch", text: text.trim() };
       onAdded(newNote);
       setText("");
     } catch { /* ignore */ } finally {
@@ -522,11 +691,14 @@ function NoteForm({ code, onAdded }: { code: string; onAdded: (note: { id: strin
 
 // ─── DetailModal ───────────────────────────────────────────────────────────────
 
-function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }: {
+function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, role, token, userName }: {
   code: string; onClose: () => void;
   onStatusChange: (code: string, status: string) => void;
   onToast: (msg: string, kind: "success" | "error") => void;
   onDetailUpdated?: () => void;
+  role?: string;
+  token?: string | null;
+  userName?: string;
 }) {
   const [detail, setDetail] = useState<WorkOrderDetail | null>(null);
   const [tab, setTab] = useState<"info" | "notes">("info");
@@ -538,17 +710,18 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
   const editableStatuses = ["submitted", "pc-review", "comm-review", "pending", "completed", "commercial-review"];
   const isEditable = detail ? editableStatuses.includes(detail.status) : false;
 
+  const authHeaders: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
+
   useEffect(() => {
     setDetail(null);
     setEditing(false);
-    fetch(`${API_BASE}/maintenance-reports/admin/${code}`).then(r => r.json()).then(setDetail).catch(console.error);
+    fetch(`${API_BASE}/maintenance-reports/admin/${code}`, { headers: authHeaders }).then(r => r.json()).then(setDetail).catch(console.error);
   }, [code]);
 
   function startEditing() {
     if (!detail) return;
     setEditEquipmentId(detail.equipmentId);
-    // Load equipment list for this building
-    fetch(`${API_BASE}/equipment/by-building?buildingId=${detail.buildingId}`)
+    fetch(`${API_BASE}/equipment/by-building?buildingId=${detail.buildingId}`, { headers: authHeaders })
       .then(r => r.json())
       .then(res => { const list = res?.data ?? res; setEquipmentList(Array.isArray(list) ? list : []); })
       .catch(() => setEquipmentList([]));
@@ -563,12 +736,11 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ equipmentId: editEquipmentId }),
       });
       if (!res.ok) throw new Error("Failed to save");
-      // Refresh detail from server
-      const updated = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`).then(r => r.json());
+      const updated = await fetch(`${API_BASE}/maintenance-reports/admin/${code}`, { headers: authHeaders }).then(r => r.json());
       setDetail(updated);
       setEditing(false);
       onToast("Equipment updated successfully", "success");
@@ -583,7 +755,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
   async function handleStatusChange(status: string) {
     setSaving(true);
     try {
-      await fetch(`${API_BASE}/maintenance-reports/admin/${code}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+      await fetch(`${API_BASE}/maintenance-reports/admin/${code}/status`, { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify({ status }) });
       onStatusChange(code, status);
       if (detail) setDetail({ ...detail, status });
       setEditing(false);
@@ -604,18 +776,29 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
           <h2 className="text-white font-bold text-base tracking-wide font-mono">{code}</h2>
           <div className="flex items-center gap-3">
             {detail && (
-              <select value={detail.status} onChange={e => handleStatusChange(e.target.value)} disabled={saving}
-                className="text-xs rounded px-2 py-1 bg-white text-gray-800 border-0 outline-none cursor-pointer transition-opacity"
-                style={{ opacity: saving ? 0.6 : 1 }}>
-                <option value="scheduled">Scheduled</option>
-                <option value="received">CBS Received</option>
-                <option value="active">Active</option>
-                <option value="submitted">Submitted</option>
-                <option value="pc-review">PC Review</option>
-                <option value="comm-review">Commercial Review</option>
-                <option value="invoice-ready">Invoice Ready</option>
-                <option value="closed">Closed</option>
-              </select>
+              <>
+                <span className="text-xs rounded px-2 py-1 bg-white/20 text-white font-semibold">
+                  {getStatusCfg(detail.status).label}
+                </span>
+                {can(role, detail.status, "download") && (
+                  <button
+                    onClick={() => { downloadReportPdf(detail); onToast("PDF downloaded", "success"); }}
+                    className="text-xs rounded px-3 py-1 bg-white/20 hover:bg-white/30 text-white font-semibold transition-all flex items-center gap-1"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3.5 5.5L6 8l2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M1.5 9.5h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                    PDF
+                  </button>
+                )}
+                {can(role, detail.status, "approve") && NEXT_STATUS[detail.status as keyof typeof NEXT_STATUS] && (
+                  <button
+                    onClick={() => handleStatusChange(NEXT_STATUS[detail.status as keyof typeof NEXT_STATUS])}
+                    disabled={saving}
+                    className="text-xs rounded px-3 py-1 bg-green-500 hover:bg-green-400 text-white font-semibold transition-all disabled:opacity-50"
+                  >
+                    {saving ? "..." : `Approve → ${getStatusCfg(NEXT_STATUS[detail.status as keyof typeof NEXT_STATUS]).label}`}
+                  </button>
+                )}
+              </>
             )}
             <button onClick={onClose} className="text-white hover:text-gray-300 ml-1 p-1 rounded hover:bg-white/10 transition-colors">
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
@@ -824,10 +1007,10 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated }
           )}
         </div>
 
-        {/* Sticky note form at bottom — only on activity tab */}
-        {tab === "notes" && detail && (
+        {/* Sticky note form at bottom — only on activity tab + if user can comment */}
+        {tab === "notes" && detail && (can(role, detail.status, "comment") || can(role, detail.status, "review")) && (
           <div className="border-t border-gray-200 bg-white p-4 rounded-b-2xl">
-            <NoteForm code={code} onAdded={(note) => {
+            <NoteForm code={code} token={token} authorName={userName} onAdded={(note) => {
               setDetail(prev => prev ? { ...prev, internalNotes: [...(prev.internalNotes ?? []), note] } : prev);
               onToast("Note added", "success");
             }} />
@@ -851,6 +1034,7 @@ export default function AdminDashboard() {
 function AdminDashboardInner() {
   const urlSearchParams = useSearchParams();
   const initialSearch = urlSearchParams.get("search") ?? "";
+  const { session, role, token } = useAdminSession();
 
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -860,6 +1044,11 @@ function AdminDashboardInner() {
   const [showBatchUpload, setShowBatchUpload] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastId = useRef(0);
+
+  // Use fallback role when no session (before admin_users table is set up)
+  const effectiveRole = role ?? "operation";
+
+  const authHeaders: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -893,9 +1082,10 @@ function AdminDashboardInner() {
       if (toDate) params.set("to", toDate);
       if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
       const [ordersRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`),
-        fetch(`${API_BASE}/maintenance-reports/admin/stats?${params}`),
+        fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`, { headers: authHeaders }),
+        fetch(`${API_BASE}/maintenance-reports/admin/stats?${params}`, { headers: authHeaders }),
       ]);
+      if (!ordersRes.ok) { console.error("Failed to fetch orders:", ordersRes.status); return; }
       setOrders(await ordersRes.json());
       setStats(await statsRes.json());
     } catch (e) {
@@ -903,7 +1093,7 @@ function AdminDashboardInner() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, statusFilter]);
+  }, [fromDate, toDate, statusFilter, token]);
 
   useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
 
@@ -975,17 +1165,12 @@ function AdminDashboardInner() {
           <div className="h-5 w-px bg-gray-200 hidden sm:block" />
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={`${inputCls} bg-white`}>
             <option value="all">All Statuses</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="received">CBS Received</option>
-            <option value="active">Active</option>
-            <option value="submitted">Submitted</option>
-            <option value="pc-review">PC Review</option>
-            <option value="comm-review">Commercial Review</option>
-            <option value="invoice-ready">Invoice Ready</option>
-            <option value="closed">Closed</option>
+            {visibleStatuses(effectiveRole).map(s => (
+              <option key={s} value={s}>{getStatusCfg(s).label}</option>
+            ))}
           </select>
           <div className="ml-auto flex items-center gap-2">
-            <button
+            {can(effectiveRole, "invoice-ready", "download") && <button
               disabled={orders.length === 0}
               onClick={() => {
                 const rows = orders.map((o) => ({
@@ -1014,15 +1199,19 @@ function AdminDashboardInner() {
             >
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6.5L6.5 9l3-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
               Export
-            </button>
-            <button onClick={() => setShowBatchUpload(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 10V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              Batch Upload
-            </button>
-            <button onClick={() => setShowAddProject(true)} className="btn-green text-xs font-semibold px-4 py-2 rounded-lg text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-              Add Project
-            </button>
+            </button>}
+            {effectiveRole === "operation" && (
+              <button onClick={() => setShowBatchUpload(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 10V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                Batch Upload
+              </button>
+            )}
+            {can(effectiveRole, "received", "approve") && (
+              <button onClick={() => setShowAddProject(true)} className="btn-green text-xs font-semibold px-4 py-2 rounded-lg text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                Add Project
+              </button>
+            )}
           </div>
         </div>
 
@@ -1250,6 +1439,9 @@ function AdminDashboardInner() {
           onStatusChange={handleStatusChange}
           onToast={addToast}
           onDetailUpdated={fetchData}
+          role={effectiveRole}
+          token={token}
+          userName={session?.name ?? session?.email}
         />
       )}
 
@@ -1258,6 +1450,7 @@ function AdminDashboardInner() {
         <AddProjectModal
           onClose={() => setShowAddProject(false)}
           onCreated={(msg) => { void fetchData(); addToast(msg, "success"); }}
+          token={token}
         />
       )}
 

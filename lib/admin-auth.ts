@@ -1,17 +1,17 @@
-export const ADMIN_SESSION_COOKIE = "yecl-admin-session";
-export const PREVIEW_ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "ops@yomaelevator.com";
-export const PREVIEW_ADMIN_PASSWORD =
-  process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "preview-access";
-export const DEFAULT_ADMIN_REDIRECT = "/admin";
-export const ADMIN_ROLES = ["admin", "dispatcher", "viewer"] as const;
+import type { AdminRole } from "./permissions";
+import { ADMIN_ROLES } from "./permissions";
 
-export type AdminRole = (typeof ADMIN_ROLES)[number];
+export { ADMIN_ROLES };
+export type { AdminRole };
+
+export const ADMIN_SESSION_COOKIE = "yecl-admin-session";
+export const DEFAULT_ADMIN_REDIRECT = "/admin";
 
 export type AdminSession = {
   sub?: string;
   email?: string;
   name?: string;
-  role?: string;
+  role?: AdminRole;
   exp?: number;
   iat?: number;
 };
@@ -53,19 +53,21 @@ export function hasValidAdminSession(value?: string) {
 }
 
 export function normalizeAdminRole(value?: string | null): AdminRole {
-  if (value === "admin" || value === "dispatcher" || value === "viewer") {
-    return value;
+  if (value && ADMIN_ROLES.includes(value as AdminRole)) {
+    return value as AdminRole;
   }
-
-  return "viewer";
+  return "operation";
 }
 
 export function formatAdminRole(value?: string | null) {
-  return normalizeAdminRole(value)
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  const LABELS: Record<AdminRole, string> = {
+    operation: "Operation",
+    "mnt-manager": "MNT Manager",
+    "pc-team": "PC Team",
+    commercial: "Commercial",
+  };
+  const role = normalizeAdminRole(value);
+  return LABELS[role] ?? role;
 }
 
 export function normalizeAdminRedirect(value?: string | null) {
@@ -73,7 +75,7 @@ export function normalizeAdminRedirect(value?: string | null) {
     return DEFAULT_ADMIN_REDIRECT;
   }
 
-  if (value.startsWith("/admin/login")) {
+  if (value.startsWith("/login")) {
     return DEFAULT_ADMIN_REDIRECT;
   }
 
