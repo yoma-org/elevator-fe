@@ -31,7 +31,8 @@ export type ReportStatus =
   | "submitted"
   | "pc-review"
   | "comm-review"
-  | "invoice-ready";
+  | "invoice-ready"
+  | "closed";
 
 /** The next status in the approval flow */
 export const NEXT_STATUS: Record<ReportStatus, string> = {
@@ -41,6 +42,7 @@ export const NEXT_STATUS: Record<ReportStatus, string> = {
   "pc-review": "comm-review",
   "comm-review": "invoice-ready",
   "invoice-ready": "closed",
+  closed: "closed",
 };
 
 const PERMISSIONS: Record<
@@ -54,6 +56,7 @@ const PERMISSIONS: Record<
     "pc-review": ["view", "comment"],
     "comm-review": ["view"],
     "invoice-ready": ["view", "download"],
+    closed: ["view"],
   },
   "mnt-manager": {
     active: ["view"],
@@ -61,15 +64,18 @@ const PERMISSIONS: Record<
     "pc-review": ["view"],
     "comm-review": ["comment"],
     "invoice-ready": ["view"],
+    closed: ["view"],
   },
   "pc-team": {
     "pc-review": ["review", "approve", "comment"],
     "comm-review": ["view"],
     "invoice-ready": ["view"],
+    closed: ["view"],
   },
   commercial: {
     "comm-review": ["review", "approve", "comment"],
     "invoice-ready": ["view", "approve", "download"],
+    closed: ["view"],
   },
 };
 
