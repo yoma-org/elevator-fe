@@ -1318,7 +1318,7 @@ export default function Home() {
                   <div><span className="text-slate-400 text-xs block">Issues</span><span className="font-medium text-slate-800 line-clamp-1">{formData.issuesFound || "None reported"}</span></div>
                 </div>
                 <div>Customer: {formData.customerName || "-"}</div>
-                <div>Initial Ticket Status: pending</div>
+                <div>Initial Ticket Status: PC Review</div>
               </section>
 
               {formData.photos.length > 0 && (

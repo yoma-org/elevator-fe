@@ -27,8 +27,6 @@ export type PermissionAction =
 
 export type ReportStatus =
   | "received"
-  | "active"
-  | "submitted"
   | "pc-review"
   | "comm-review"
   | "invoice-ready"
@@ -36,9 +34,7 @@ export type ReportStatus =
 
 /** The next status in the approval flow */
 export const NEXT_STATUS: Record<ReportStatus, string> = {
-  received: "active",
-  active: "submitted",
-  submitted: "pc-review",
+  received: "pc-review",
   "pc-review": "comm-review",
   "comm-review": "invoice-ready",
   "invoice-ready": "closed",
@@ -51,16 +47,12 @@ const PERMISSIONS: Record<
 > = {
   operation: {
     received: ["view", "approve"],
-    active: ["view", "comment"],
-    submitted: ["view", "comment"],
     "pc-review": ["view", "comment"],
     "comm-review": ["view"],
     "invoice-ready": ["view", "download"],
-    closed: ["view"],
+    closed: ["view", "download"],
   },
   "mnt-manager": {
-    active: ["view"],
-    submitted: ["view"],
     "pc-review": ["view"],
     "comm-review": ["comment"],
     "invoice-ready": ["view"],
@@ -75,7 +67,7 @@ const PERMISSIONS: Record<
   commercial: {
     "comm-review": ["review", "approve", "comment"],
     "invoice-ready": ["view", "approve", "download"],
-    closed: ["view"],
+    closed: ["view", "download"],
   },
 };
 

@@ -61,10 +61,12 @@ interface WorkOrder {
 
 interface WorkOrderDetail extends WorkOrder {
   buildingId: string; equipmentId: string;
-  checklistResults: { equipmentType: string | null; checkedCount: number; totalCount: number;
-    categories: Array<{ category: string; items: Array<{ label: string; checked: boolean }> }> } | null;
+  checklistResults: { equipmentType: string | null; templateName?: string | null; checkedCount: number; totalCount: number;
+    categories: Array<{ category: string; items: Array<{ label: string; checked: boolean; status?: string }> }> } | null;
   remarks: string | null;
   internalNotes: Array<{ id: string; at: string; author: string; kind: string; text: string }> | null;
+  technicianSignature: string | null;
+  customerSignature: string | null;
   assignedTo: string | null; updatedAt: string;
 }
 
@@ -77,15 +79,14 @@ interface EquipmentItem { id: string; equipmentCode: string; equipmentType: stri
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot?: string }> = {
   scheduled:      { label: "SCHEDULED",         bg: "#f3f4f6", text: "#374151", dot: "#9ca3af" },
   received:       { label: "CBS RECEIVED",       bg: "#fef9c3", text: "#713f12", dot: "#ca8a04" },
-  active:         { label: "ACTIVE",             bg: "#fde8e8", text: "#9b1c1c", dot: "#ef4444" },
-  submitted:      { label: "SUBMITTED",          bg: "#fff3cd", text: "#856404", dot: "#d97706" },
   "pc-review":    { label: "PC REVIEW",          bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   "comm-review":  { label: "COMMERCIAL REVIEW",  bg: "#ede9fe", text: "#5b21b6", dot: "#8b5cf6" },
   "invoice-ready":{ label: "INVOICE READY",      bg: "#cffafe", text: "#155e75", dot: "#06b6d4" },
   closed:         { label: "CLOSED",             bg: "#d1fae5", text: "#065f46", dot: "#10b981" },
   // legacy aliases kept for existing DB records
-  pending:        { label: "SUBMITTED",          bg: "#fff3cd", text: "#856404", dot: "#d97706" },
-  "in-progress":  { label: "ACTIVE",             bg: "#fde8e8", text: "#9b1c1c", dot: "#ef4444" },
+  pending:        { label: "PC REVIEW",           bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
+  "in-progress":  { label: "PC REVIEW",          bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
+  active:         { label: "PC REVIEW",          bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   completed:      { label: "PC REVIEW",          bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   "commercial-review": { label: "COMMERCIAL REVIEW", bg: "#ede9fe", text: "#5b21b6", dot: "#8b5cf6" },
   cancelled:      { label: "CANCELLED",          bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
@@ -94,161 +95,395 @@ function getStatusCfg(s: string) { return STATUS_CONFIG[s] ?? { label: s.toUpper
 
 // ─── PDF Report Generator ─────────────────────────────────────────────────────
 
-function downloadReportPdf(d: WorkOrderDetail) {
-  const doc = new jsPDF();
+function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; reports: any[] }) {
+  const doc = new jsPDF({ orientation: "landscape" });
   const pageW = doc.internal.pageSize.getWidth();
-  let y = 15;
+  const pageH = doc.internal.pageSize.getHeight();
+  const mx = 10; // margin x
+  const contentW = pageW - mx * 2;
+  let y = 8;
 
-  // Header
-  doc.setFillColor(26, 58, 42); // #1a3a2a
-  doc.rect(0, 0, pageW, 32, "F");
+  const GREEN: [number, number, number] = [0, 100, 60];
+  const DARK: [number, number, number] = [30, 30, 30];
+  const GRAY: [number, number, number] = [100, 100, 100];
+  const LIGHT_GREEN: [number, number, number] = [230, 245, 235];
+
+  // ── Helper: section title ──
+  function sectionTitle(num: string, title: string) {
+    if (y > pageH - 25) { doc.addPage(); y = 10; }
+    doc.setFillColor(...GREEN);
+    doc.rect(mx, y, contentW, 7, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${num}. ${title}`, mx + 3, y + 5);
+    y += 9;
+    doc.setTextColor(...DARK);
+  }
+
+  // ── Helper: status symbol ──
+  function statusSymbol(status?: string): string {
+    if (!status) return "—";
+    const s = status.toLowerCase();
+    if (s.includes("good")) return "\u2713";   // ✓
+    if (s.includes("adjust")) return "O";
+    if (s.includes("repair")) return "X";
+    if (s.includes("na")) return "N/A";
+    return status;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // HEADER
+  // ═══════════════════════════════════════════════════════════════════════════════
+  doc.setFillColor(...GREEN);
+  doc.rect(0, 0, pageW, 22, "F");
+
+  // Company name
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("YECL MAINTENANCE SERVICE REPORT", 14, 14);
-  doc.setFontSize(10);
+  doc.text("YOMA ELEVATOR", mx + 2, 9);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text("Yoma Elevator Co., Ltd.", 14, 21);
-  doc.setFontSize(12);
+  doc.text("Yoma Elevator Co., Ltd.", mx + 2, 15);
+
+  // Title centered
+  doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text(d.id ?? "", pageW - 14, 14, { align: "right" });
-  doc.setFontSize(9);
+  doc.text("MAINTENANCE MANAGEMENT PLANNING RECORD", pageW / 2, 10, { align: "center" });
+
+  // Report code + status right
+  doc.setFontSize(11);
+  doc.text(d.id ?? "", pageW - mx - 2, 9, { align: "right" });
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text(getStatusCfg(d.status).label, pageW - 14, 21, { align: "right" });
+  doc.text(getStatusCfg(d.status).label, pageW - mx - 2, 15, { align: "right" });
 
-  y = 40;
-  doc.setTextColor(0, 0, 0);
+  // Thin accent line
+  doc.setFillColor(0, 180, 100);
+  doc.rect(0, 22, pageW, 1.2, "F");
 
-  // ── Information table ──
-  const infoRows = [
-    ["Report Code", d.id ?? "—", "Status", getStatusCfg(d.status).label],
-    ["Building", d.building ?? "—", "Priority", d.priority ?? "—"],
-    ["Lift No.", d.equipmentCode ?? "—", "Equipment Type", d.equipmentType ?? "—"],
-    ["Maintenance Type", d.maintenanceType ?? "—", "Technician", d.technicianName ?? "—"],
-    ["Arrival Date", d.arrivalDateTime ? fmtDate(d.arrivalDateTime) : "—", "Arrival Time", d.arrivalDateTime ? fmtTime(d.arrivalDateTime) : "—"],
-    ["Assigned To", d.assignedTo ?? "—", "Submitted At", d.submittedAt ? fmtDate(d.submittedAt) : "—"],
-  ];
+  y = 27;
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 1. EQUIPMENT INFORMATION
+  // ═══════════════════════════════════════════════════════════════════════════════
+  sectionTitle("1", "Equipment Information");
 
   autoTable(doc, {
     startY: y,
-    head: [["Field", "Value", "Field", "Value"]],
-    body: infoRows,
+    body: [
+      ["ELE Type", d.equipmentType ?? "—", "Report Code", d.id ?? "—", "Status", getStatusCfg(d.status).label],
+      ["Building", d.building ?? "—", "Car / Lift No.", d.equipmentCode ?? "—", "Priority", d.priority ?? "—"],
+      ["Maintenance Type", d.maintenanceType ?? "—", "Technician", d.technicianName ?? "—", "Assigned To", d.assignedTo ?? "—"],
+      ["Arrival Date", d.arrivalDateTime ? fmtDate(d.arrivalDateTime) : "—", "Arrival Time", d.arrivalDateTime ? fmtTime(d.arrivalDateTime) : "—", "Submitted", d.submittedAt ? fmtDate(d.submittedAt) : "—"],
+    ],
     theme: "grid",
-    headStyles: { fillColor: [26, 58, 42], textColor: 255, fontSize: 8, fontStyle: "bold" },
-    bodyStyles: { fontSize: 8 },
+    styles: { fontSize: 8, cellPadding: 2.5 },
     columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 35, textColor: [100, 100, 100] },
-      1: { cellWidth: 55 },
-      2: { fontStyle: "bold", cellWidth: 35, textColor: [100, 100, 100] },
-      3: { cellWidth: 55 },
+      0: { fontStyle: "bold", cellWidth: 30, textColor: GRAY, fillColor: LIGHT_GREEN },
+      1: { cellWidth: 60 },
+      2: { fontStyle: "bold", cellWidth: 30, textColor: GRAY, fillColor: LIGHT_GREEN },
+      3: { cellWidth: 60 },
+      4: { fontStyle: "bold", cellWidth: 28, textColor: GRAY, fillColor: LIGHT_GREEN },
+      5: { cellWidth: 52 },
     },
-    margin: { left: 14, right: 14 },
+    margin: { left: mx, right: mx },
   });
+  y = (doc as any).lastAutoTable.finalY + 6;
 
-  y = (doc as any).lastAutoTable.finalY + 8;
-
-  // ── Findings ──
-  if (d.findings) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(26, 58, 42);
-    doc.text("Issue Description / Findings", 14, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
-    const lines = doc.splitTextToSize(d.findings, pageW - 28);
-    doc.text(lines, 14, y);
-    y += lines.length * 4.5 + 4;
-  }
-
-  // ── Work Performed ──
-  if (d.workPerformed) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(26, 58, 42);
-    doc.text("Work Performed / Action Taken", 14, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
-    const lines = doc.splitTextToSize(d.workPerformed, pageW - 28);
-    doc.text(lines, 14, y);
-    y += lines.length * 4.5 + 4;
-  }
-
-  // ── Parts Used ──
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 2. PARTS REPLACEMENT RECORD
+  // ═══════════════════════════════════════════════════════════════════════════════
   if (d.partsUsed && d.partsUsed.length > 0) {
+    sectionTitle("2", "Parts Replacement Record");
+
     autoTable(doc, {
       startY: y,
-      head: [["Part Name", "Quantity"]],
-      body: d.partsUsed.map(p => [p.name, String(p.quantity)]),
+      head: [["No.", "Name of Part", "Qty", "Replaced By", "Date"]],
+      body: d.partsUsed.map((p, i) => [
+        String(i + 1),
+        p.name,
+        String(p.quantity),
+        d.technicianName ?? "—",
+        d.arrivalDateTime ? fmtDate(d.arrivalDateTime) : "—",
+      ]),
       theme: "grid",
-      headStyles: { fillColor: [26, 58, 42], textColor: 255, fontSize: 8, fontStyle: "bold" },
-      bodyStyles: { fontSize: 8 },
-      columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 30, halign: "center" } },
-      margin: { left: 14, right: 14 },
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 100 },
+        2: { cellWidth: 18, halign: "center" },
+        3: { cellWidth: 50 },
+        4: { cellWidth: 35, halign: "center" },
+      },
+      margin: { left: mx, right: mx },
     });
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 6;
   }
 
-  // ── Checklist ──
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 3. MAINTENANCE RECORD (Checklist)
+  // ═══════════════════════════════════════════════════════════════════════════════
   if (d.checklistResults && d.checklistResults.categories.length > 0) {
-    // Check if we need a new page
-    if (y > 240) { doc.addPage(); y = 15; }
+    const cr = d.checklistResults;
+    sectionTitle("3", `Maintenance Record — Checklist (${cr.checkedCount}/${cr.totalCount})`);
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(26, 58, 42);
-    doc.text(`Checklist Results (${d.checklistResults.checkedCount}/${d.checklistResults.totalCount})`, 14, y);
-    y += 2;
+    // Legend
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...GRAY);
+    doc.text("Good (\u2713)    Adjusted (O)    Repair (X)    N/A    — Not checked", mx + 3, y);
+    y += 5;
 
-    const checkRows: string[][] = [];
-    d.checklistResults.categories.forEach(cat => {
+    const checkRows: (string | { content: string; styles?: Record<string, unknown> })[][] = [];
+    let rowNum = 0;
+
+    cr.categories.forEach(cat => {
+      // Category header row
+      checkRows.push([{ content: cat.category.toUpperCase(), styles: { fontStyle: "bold" as const, fillColor: [240, 248, 240] as [number, number, number], colSpan: 4 } }, "", "", ""]);
       cat.items.forEach(item => {
-        checkRows.push([cat.category, item.label, item.checked ? "Pass" : "—"]);
+        rowNum++;
+        const sym = statusSymbol(item.status);
+        const symColor: [number, number, number] =
+          sym === "\u2713" ? [0, 130, 60] :
+          sym === "O" ? [200, 120, 0] :
+          sym === "X" ? [200, 30, 30] :
+          [120, 120, 120];
+        checkRows.push([
+          String(rowNum),
+          item.label,
+          { content: sym, styles: { textColor: symColor, fontStyle: "bold" as const, halign: "center" as const, fontSize: 10 } },
+          item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : "—",
+        ]);
       });
     });
 
     autoTable(doc, {
       startY: y,
-      head: [["Category", "Item", "Status"]],
+      head: [["No.", "Item", "Result", "Status"]],
       body: checkRows,
       theme: "grid",
-      headStyles: { fillColor: [26, 58, 42], textColor: 255, fontSize: 8, fontStyle: "bold" },
-      bodyStyles: { fontSize: 7.5 },
-      columnStyles: { 0: { cellWidth: 40 }, 2: { cellWidth: 20, halign: "center" } },
-      margin: { left: 14, right: 14 },
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 160 },
+        2: { cellWidth: 18, halign: "center" },
+        3: { cellWidth: 35 },
+      },
+      margin: { left: mx, right: mx },
     });
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 6;
   }
 
-  // ── Remarks ──
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 4. FINDINGS & WORK PERFORMED
+  // ═══════════════════════════════════════════════════════════════════════════════
+  if (d.findings || d.workPerformed) {
+    sectionTitle("4", "Findings & Work Performed");
+
+    const rows: string[][] = [];
+    if (d.findings) rows.push(["Findings", d.findings]);
+    if (d.workPerformed) rows.push(["Work Performed", d.workPerformed]);
+
+    autoTable(doc, {
+      startY: y,
+      body: rows,
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 3 },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 35, textColor: GRAY, fillColor: LIGHT_GREEN },
+        1: { cellWidth: contentW - 35 },
+      },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 5. REMARKS
+  // ═══════════════════════════════════════════════════════════════════════════════
   if (d.remarks) {
-    if (y > 260) { doc.addPage(); y = 15; }
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(26, 58, 42);
-    doc.text("Remarks", 14, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
-    const lines = doc.splitTextToSize(d.remarks, pageW - 28);
-    doc.text(lines, 14, y);
-    y += lines.length * 4.5 + 4;
+    sectionTitle("5", "Remarks");
+
+    autoTable(doc, {
+      startY: y,
+      body: [[d.remarks]],
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 3 },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
   }
 
-  // ── Footer ──
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // MMPR SECTIONS (6-11) — only if mmprResponse provided
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const mmpr = mmprResponse?.mmpr;
+  let sectionNum = 6;
+
+  // 6. Break Armature Gap
+  if (mmpr?.break_armature_gap?.length > 0) {
+    sectionTitle(String(sectionNum), "Break Armature Gap Setting Value");
+    autoTable(doc, {
+      startY: y,
+      head: [["Item", "Standard Value", "Checked Value", "Date", "Checked By"]],
+      body: mmpr.break_armature_gap.map((r: any) => [r.item ?? "", r.standardValue ?? "", r.checkedValue ?? "", r.date ?? "", r.checkedBy ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // 7. Rope Investigation
+  if (mmpr?.rope_investigation?.length > 0) {
+    sectionTitle(String(sectionNum), "Rope Investigation Result");
+    autoTable(doc, {
+      startY: y,
+      head: [["Sheave Position", "Ropes Checked", "Result", "Date", "Checked By"]],
+      body: mmpr.rope_investigation.map((r: any) => [r.sheavePosition ?? "", r.ropesChecked ?? "", r.result ?? "", r.checkedDate ?? "", r.checkedBy ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // 8. Work Instructions
+  if (mmpr?.work_instructions?.length > 0) {
+    sectionTitle(String(sectionNum), "Work Instruction in Regular Service Periods");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "Name", "Item", "Contents"]],
+      body: mmpr.work_instructions.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.name ?? "", r.item ?? "", r.contents ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // 9. Work Details
+  if (mmpr?.work_details?.length > 0) {
+    sectionTitle(String(sectionNum), "Work Details in Regular Service Periods");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "Name", "Item", "Contents"]],
+      body: mmpr.work_details.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.name ?? "", r.item ?? "", r.contents ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // 10. Major Repairs
+  if (mmpr?.major_repairs?.length > 0) {
+    sectionTitle(String(sectionNum), "Major Repair Works Record");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "Work Done By", "Checked By", "Details of Works Carried Out", "Remarks"]],
+      body: mmpr.major_repairs.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.workDoneBy ?? "", r.checkedBy ?? "", r.details ?? "", r.remarks ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // 11. Call Back Records
+  if (mmpr?.call_back_records?.length > 0) {
+    sectionTitle(String(sectionNum), "Call Back Record");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "PIC", "Checked By", "Received", "Arrived", "Completion", "Trouble Found", "Action Taken"]],
+      body: mmpr.call_back_records.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.pic ?? "", r.checkedBy ?? "", r.received ?? "", r.arrived ?? "", r.completion ?? "", r.troubleFound ?? "", r.actionTaken ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 7, cellPadding: 2 },
+      columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // SIGNATURES
+  // ═══════════════════════════════════════════════════════════════════════════════
+  if (d.technicianSignature || d.customerSignature) {
+    sectionTitle(String(sectionNum), "Signatures");
+
+    const sigW = 70;
+    const sigH = 25;
+    const colW = contentW / 2;
+
+    // Signature boxes
+    const leftX = mx;
+    const rightX = mx + colW;
+
+    // Technician signature (left)
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(leftX, y, colW - 4, sigH + 14);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...GRAY);
+    doc.text("Technician Signature", leftX + 3, y + 5);
+    if (d.technicianSignature) {
+      try { doc.addImage(d.technicianSignature, "PNG", leftX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text(d.technicianName ?? "", leftX + 3, y + sigH + 11);
+
+    // Customer signature (right)
+    doc.rect(rightX, y, colW - 4, sigH + 14);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Customer Signature", rightX + 3, y + 5);
+    if (d.customerSignature) {
+      try { doc.addImage(d.customerSignature, "PNG", rightX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
+    }
+
+    y += sigH + 20;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // FOOTER on every page
+  // ═══════════════════════════════════════════════════════════════════════════════
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
+    // Bottom line
+    doc.setDrawColor(...GREEN);
+    doc.setLineWidth(0.5);
+    doc.line(mx, pageH - 12, pageW - mx, pageH - 12);
+    // Footer text
     doc.setFontSize(7);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Generated: ${new Date().toLocaleString()} | Page ${i}/${pageCount}`, pageW / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+    doc.setTextColor(...GRAY);
+    doc.text(`MMPR — ${d.id ?? ""} — ${d.building ?? ""}`, mx, pageH - 8);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageW / 2, pageH - 8, { align: "center" });
+    doc.text(`Page ${i} / ${pageCount}`, pageW - mx, pageH - 8, { align: "right" });
   }
 
-  doc.save(`Report_${d.id ?? "unknown"}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`MMPR_${d.id ?? "unknown"}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 function fmtDate(iso: string) { if (!iso) return "-"; const d = new Date(iso); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; }
@@ -389,10 +624,9 @@ function StatCard({ iconKey, label, value, unit, ok, active, onClick }: { iconKe
 
 function StatusBadge({ status }: { status: string }) {
   const cfg = getStatusCfg(status);
-  const isActive = status === "active" || status === "in-progress";
   return (
     <span
-      className={`text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex items-center gap-1.5 ${isActive ? "active-pulse" : ""}`}
+      className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex items-center gap-1.5"
       style={{ backgroundColor: cfg.bg, color: cfg.text }}
     >
       {cfg.dot && <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: cfg.dot, display: "inline-block", flexShrink: 0 }} />}
@@ -689,6 +923,29 @@ function NoteForm({ code, onAdded, token, authorName }: { code: string; onAdded:
   );
 }
 
+// ─── MmprSection ──────────────────────────────────────────────────────────────
+
+function MmprSection({ title, children, onAdd }: { title: string; children: React.ReactNode; onAdd: () => void }) {
+  return (
+    <div className="rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between bg-gray-50 px-4 py-2.5 border-b border-gray-200">
+        <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h4>
+        <button onClick={onAdd} className="text-xs rounded-lg px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 font-semibold transition-all flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          Add
+        </button>
+      </div>
+      <div className="p-3 space-y-2">
+        {Array.isArray(children) && (children as any[]).length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-3">No records yet. Click Add to start.</p>
+        ) : (children as any)?.length === 0 || !children ? (
+          <p className="text-xs text-gray-400 text-center py-3">No records yet. Click Add to start.</p>
+        ) : children}
+      </div>
+    </div>
+  );
+}
+
 // ─── DetailModal ───────────────────────────────────────────────────────────────
 
 function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, role, token, userName }: {
@@ -701,13 +958,19 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
   userName?: string;
 }) {
   const [detail, setDetail] = useState<WorkOrderDetail | null>(null);
-  const [tab, setTab] = useState<"info" | "notes">("info");
+  const [tab, setTab] = useState<"info" | "notes" | "mmpr">("info");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   const [editEquipmentId, setEditEquipmentId] = useState("");
 
-  const editableStatuses = ["submitted", "pc-review", "comm-review", "pending", "completed", "commercial-review"];
+  // MMPR state
+  const [mmprData, setMmprData] = useState<{ mmpr: any; reports: any[] } | null>(null);
+  const [mmprYear, setMmprYear] = useState(new Date().getFullYear());
+  const [mmprSaving, setMmprSaving] = useState(false);
+  const [mmprDraft, setMmprDraft] = useState<Record<string, any>>({});
+
+  const editableStatuses = ["pc-review", "comm-review", "pending", "completed", "commercial-review"];
   const isEditable = detail ? editableStatuses.includes(detail.status) : false;
 
   const authHeaders: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
@@ -767,6 +1030,50 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
     }
   }
 
+  // Fetch MMPR data when tab switches to mmpr
+  useEffect(() => {
+    if (tab !== "mmpr" || !detail) return;
+    setMmprData(null);
+    fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${mmprYear}`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => { setMmprData(d); setMmprDraft({ break_armature_gap: d.mmpr.break_armature_gap ?? [], rope_investigation: d.mmpr.rope_investigation ?? [], work_instructions: d.mmpr.work_instructions ?? [], work_details: d.mmpr.work_details ?? [], major_repairs: d.mmpr.major_repairs ?? [], call_back_records: d.mmpr.call_back_records ?? [] }); })
+      .catch(console.error);
+  }, [tab, detail?.equipmentId, mmprYear]);
+
+  async function handleMmprSave() {
+    if (!detail) return;
+    setMmprSaving(true);
+    try {
+      await fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${mmprYear}`, {
+        method: "PUT", headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(mmprDraft),
+      });
+      onToast("MMPR data saved", "success");
+      // Refresh
+      const d = await fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${mmprYear}`, { headers: authHeaders }).then(r => r.json());
+      setMmprData(d);
+    } catch {
+      onToast("Failed to save MMPR data", "error");
+    } finally {
+      setMmprSaving(false);
+    }
+  }
+
+  // Helper to update a JSONB array field in mmprDraft
+  function updateMmprRow(field: string, index: number, value: Record<string, unknown>) {
+    setMmprDraft(prev => {
+      const arr = [...(prev[field] ?? [])];
+      arr[index] = { ...arr[index], ...value };
+      return { ...prev, [field]: arr };
+    });
+  }
+  function addMmprRow(field: string, template: Record<string, unknown>) {
+    setMmprDraft(prev => ({ ...prev, [field]: [...(prev[field] ?? []), template] }));
+  }
+  function removeMmprRow(field: string, index: number) {
+    setMmprDraft(prev => ({ ...prev, [field]: (prev[field] ?? []).filter((_: unknown, i: number) => i !== index) }));
+  }
+
   const editInputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none transition-all focus:border-green-600 focus:ring-2 focus:ring-green-100 resize-none";
 
   return (
@@ -782,11 +1089,17 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                 </span>
                 {can(role, detail.status, "download") && (
                   <button
-                    onClick={() => { downloadReportPdf(detail); onToast("PDF downloaded", "success"); }}
-                    className="text-xs rounded px-3 py-1 bg-white/20 hover:bg-white/30 text-white font-semibold transition-all flex items-center gap-1"
+                    onClick={async () => {
+                      try {
+                        const mmpr = await fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${new Date(detail.arrivalDateTime).getFullYear()}`, { headers: authHeaders }).then(r => r.json());
+                        downloadReportPdf(detail, mmpr);
+                        onToast("MMPR generated", "success");
+                      } catch { downloadReportPdf(detail); onToast("MMPR generated (without MMPR data)", "success"); }
+                    }}
+                    className="text-xs rounded-lg px-3.5 py-1.5 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold transition-all flex items-center gap-1.5 hover:scale-[1.03] active:scale-95"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3.5 5.5L6 8l2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M1.5 9.5h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-                    PDF
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 1.75h4.375L11.5 5.375v6.875a1 1 0 01-1 1h-6a1 1 0 01-1-1v-10a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7.875 1.75v3.625H11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Generate MMPR
                   </button>
                 )}
                 {can(role, detail.status, "approve") && NEXT_STATUS[detail.status as keyof typeof NEXT_STATUS] && (
@@ -807,17 +1120,19 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
         </div>
 
         <div className="flex border-b border-gray-200 flex-shrink-0">
-          {(["info", "notes"] as const).map(t => (
+          {(["info", "notes", "mmpr"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-6 py-3 text-sm font-medium transition-all relative flex items-center gap-2 ${tab === t ? "text-green-700" : "text-gray-500 hover:text-gray-700"}`}>
               {t === "info" ? (
                 <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/><path d="M7 5v1M7 7.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>Details</>
-              ) : (
+              ) : t === "notes" ? (
                 <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h10v7H5l-3 2V3z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5 6h4M5 8h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>Activity
                 {detail && detail.internalNotes && detail.internalNotes.length > 0 && (
                   <span className="text-[10px] font-bold bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{detail.internalNotes.length}</span>
                 )}
                 </>
+              ) : (
+                <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 1.75h4.375L11.5 5.375v6.875a1 1 0 01-1 1h-6a1 1 0 01-1-1v-10a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7.875 1.75v3.625H11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>MMPR</>
               )}
               {tab === t && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-700 rounded-t" style={{ animation: "fadeIn .15s ease" }} />}
             </button>
@@ -833,9 +1148,9 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
             <div className="space-y-5" style={{ animation: "fadeIn .2s ease" }}>
               {/* Status timeline */}
               <div className="flex items-center gap-0 overflow-x-auto pb-2 -mx-1">
-                {(["received", "active", "submitted", "pc-review", "comm-review", "invoice-ready", "closed"] as const).map((s, i, arr) => {
+                {(["received", "pc-review", "comm-review", "invoice-ready", "closed"] as const).map((s, i, arr) => {
                   const cfg = getStatusCfg(s);
-                  const statusOrder = ["scheduled", "received", "active", "submitted", "pc-review", "comm-review", "invoice-ready", "closed"];
+                  const statusOrder = ["scheduled", "received", "pc-review", "comm-review", "invoice-ready", "closed"];
                   const currentIdx = statusOrder.indexOf(detail.status);
                   const thisIdx = statusOrder.indexOf(s);
                   const isPast = thisIdx < currentIdx;
@@ -967,7 +1282,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                 </Section>
               )}
             </div>
-          ) : (
+          ) : tab === "notes" ? (
             <div style={{ animation: "fadeIn .2s ease" }}>
               {/* Notes timeline */}
               <div className="space-y-0">
@@ -1003,6 +1318,136 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   ))
                 }
               </div>
+            </div>
+          ) : (
+            /* MMPR Tab */
+            <div style={{ animation: "fadeIn .2s ease" }}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-gray-800">MMPR Data — {detail.equipmentCode}</h3>
+                <div className="flex items-center gap-2">
+                  <select value={mmprYear} onChange={e => setMmprYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-2 py-1 text-sm">
+                    {[2024, 2025, 2026, 2027].map(yr => <option key={yr} value={yr}>{yr}</option>)}
+                  </select>
+                  <button onClick={handleMmprSave} disabled={mmprSaving} className="text-xs rounded-lg px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-semibold transition-all disabled:opacity-50">
+                    {mmprSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+
+              {!mmprData ? (
+                <div className="space-y-3 py-2">{[1,2,3].map(i => <div key={i} className="skeleton h-4 w-full" style={{ width: `${60 + i * 10}%` }} />)}</div>
+              ) : (
+                <div className="space-y-5">
+                  {/* Break Armature Gap */}
+                  <MmprSection title="Break Armature Gap Setting" onAdd={() => addMmprRow("break_armature_gap", { item: "", standardValue: "", checkedValue: "", date: "", checkedBy: "" })}>
+                    {(mmprDraft.break_armature_gap ?? []).map((row: any, i: number) => (
+                      <div key={i} className="grid grid-cols-6 gap-2 items-center">
+                        <input className={editInputCls} placeholder="Item" value={row.item ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { item: e.target.value })} />
+                        <input className={editInputCls} placeholder="Standard" value={row.standardValue ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { standardValue: e.target.value })} />
+                        <input className={editInputCls} placeholder="Checked" value={row.checkedValue ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { checkedValue: e.target.value })} />
+                        <input className={editInputCls} type="date" value={row.date ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { date: e.target.value })} />
+                        <input className={editInputCls} placeholder="Checked By" value={row.checkedBy ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { checkedBy: e.target.value })} />
+                        <button onClick={() => removeMmprRow("break_armature_gap", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                      </div>
+                    ))}
+                  </MmprSection>
+
+                  {/* Rope Investigation */}
+                  <MmprSection title="Rope Investigation Result" onAdd={() => addMmprRow("rope_investigation", { sheavePosition: "", ropesChecked: "", checkedDate: "", checkedBy: "", result: "" })}>
+                    {(mmprDraft.rope_investigation ?? []).map((row: any, i: number) => (
+                      <div key={i} className="grid grid-cols-6 gap-2 items-center">
+                        <input className={editInputCls} placeholder="Sheave Position" value={row.sheavePosition ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { sheavePosition: e.target.value })} />
+                        <input className={editInputCls} placeholder="Ropes Checked" value={row.ropesChecked ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { ropesChecked: e.target.value })} />
+                        <input className={editInputCls} placeholder="Result" value={row.result ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { result: e.target.value })} />
+                        <input className={editInputCls} type="date" value={row.checkedDate ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { checkedDate: e.target.value })} />
+                        <input className={editInputCls} placeholder="Checked By" value={row.checkedBy ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { checkedBy: e.target.value })} />
+                        <button onClick={() => removeMmprRow("rope_investigation", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                      </div>
+                    ))}
+                  </MmprSection>
+
+                  {/* Work Instructions */}
+                  <MmprSection title="Work Instruction in Regular Service" onAdd={() => addMmprRow("work_instructions", { date: "", name: "", item: "", contents: "" })}>
+                    {(mmprDraft.work_instructions ?? []).map((row: any, i: number) => (
+                      <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                        <input className={editInputCls} type="date" value={row.date ?? ""} onChange={e => updateMmprRow("work_instructions", i, { date: e.target.value })} />
+                        <input className={editInputCls} placeholder="Name" value={row.name ?? ""} onChange={e => updateMmprRow("work_instructions", i, { name: e.target.value })} />
+                        <input className={editInputCls} placeholder="Item" value={row.item ?? ""} onChange={e => updateMmprRow("work_instructions", i, { item: e.target.value })} />
+                        <input className={editInputCls} placeholder="Contents" value={row.contents ?? ""} onChange={e => updateMmprRow("work_instructions", i, { contents: e.target.value })} />
+                        <button onClick={() => removeMmprRow("work_instructions", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                      </div>
+                    ))}
+                  </MmprSection>
+
+                  {/* Work Details */}
+                  <MmprSection title="Work Details in Regular Service" onAdd={() => addMmprRow("work_details", { date: "", name: "", item: "", contents: "" })}>
+                    {(mmprDraft.work_details ?? []).map((row: any, i: number) => (
+                      <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                        <input className={editInputCls} type="date" value={row.date ?? ""} onChange={e => updateMmprRow("work_details", i, { date: e.target.value })} />
+                        <input className={editInputCls} placeholder="Name" value={row.name ?? ""} onChange={e => updateMmprRow("work_details", i, { name: e.target.value })} />
+                        <input className={editInputCls} placeholder="Item" value={row.item ?? ""} onChange={e => updateMmprRow("work_details", i, { item: e.target.value })} />
+                        <input className={editInputCls} placeholder="Contents" value={row.contents ?? ""} onChange={e => updateMmprRow("work_details", i, { contents: e.target.value })} />
+                        <button onClick={() => removeMmprRow("work_details", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                      </div>
+                    ))}
+                  </MmprSection>
+
+                  {/* Major Repairs */}
+                  <MmprSection title="Major Repair Works Record" onAdd={() => addMmprRow("major_repairs", { date: "", workDoneBy: "", checkedBy: "", details: "", remarks: "" })}>
+                    {(mmprDraft.major_repairs ?? []).map((row: any, i: number) => (
+                      <div key={i} className="grid grid-cols-6 gap-2 items-center">
+                        <input className={editInputCls} type="date" value={row.date ?? ""} onChange={e => updateMmprRow("major_repairs", i, { date: e.target.value })} />
+                        <input className={editInputCls} placeholder="Work Done By" value={row.workDoneBy ?? ""} onChange={e => updateMmprRow("major_repairs", i, { workDoneBy: e.target.value })} />
+                        <input className={editInputCls} placeholder="Checked By" value={row.checkedBy ?? ""} onChange={e => updateMmprRow("major_repairs", i, { checkedBy: e.target.value })} />
+                        <input className={editInputCls} placeholder="Details" value={row.details ?? ""} onChange={e => updateMmprRow("major_repairs", i, { details: e.target.value })} />
+                        <input className={editInputCls} placeholder="Remarks" value={row.remarks ?? ""} onChange={e => updateMmprRow("major_repairs", i, { remarks: e.target.value })} />
+                        <button onClick={() => removeMmprRow("major_repairs", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                      </div>
+                    ))}
+                  </MmprSection>
+
+                  {/* Call Back Records */}
+                  <MmprSection title="Call Back Record" onAdd={() => addMmprRow("call_back_records", { date: "", pic: "", checkedBy: "", received: "", arrived: "", completion: "", troubleFound: "", actionTaken: "" })}>
+                    {(mmprDraft.call_back_records ?? []).map((row: any, i: number) => (
+                      <div key={i} className="space-y-2">
+                        <div className="grid grid-cols-4 gap-2">
+                          <input className={editInputCls} type="date" value={row.date ?? ""} onChange={e => updateMmprRow("call_back_records", i, { date: e.target.value })} />
+                          <input className={editInputCls} placeholder="PIC" value={row.pic ?? ""} onChange={e => updateMmprRow("call_back_records", i, { pic: e.target.value })} />
+                          <input className={editInputCls} placeholder="Checked By" value={row.checkedBy ?? ""} onChange={e => updateMmprRow("call_back_records", i, { checkedBy: e.target.value })} />
+                          <button onClick={() => removeMmprRow("call_back_records", i)} className="text-red-400 hover:text-red-600 text-xs justify-self-end">Remove</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <input className={editInputCls} placeholder="Received" value={row.received ?? ""} onChange={e => updateMmprRow("call_back_records", i, { received: e.target.value })} />
+                          <input className={editInputCls} placeholder="Arrived" value={row.arrived ?? ""} onChange={e => updateMmprRow("call_back_records", i, { arrived: e.target.value })} />
+                          <input className={editInputCls} placeholder="Completion" value={row.completion ?? ""} onChange={e => updateMmprRow("call_back_records", i, { completion: e.target.value })} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input className={editInputCls} placeholder="Trouble Found" value={row.troubleFound ?? ""} onChange={e => updateMmprRow("call_back_records", i, { troubleFound: e.target.value })} />
+                          <input className={editInputCls} placeholder="Action Taken" value={row.actionTaken ?? ""} onChange={e => updateMmprRow("call_back_records", i, { actionTaken: e.target.value })} />
+                        </div>
+                      </div>
+                    ))}
+                  </MmprSection>
+
+                  {/* Aggregated maintenance reports for this year */}
+                  {mmprData.reports.length > 0 && (
+                    <div className="rounded-xl border border-gray-200 p-4">
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Service Visits in {mmprYear} ({mmprData.reports.length})</h4>
+                      <div className="space-y-2">
+                        {mmprData.reports.map((r: any, i: number) => (
+                          <div key={i} className="flex items-center gap-3 text-xs text-gray-700 py-1.5 border-b border-gray-100 last:border-0">
+                            <span className="font-mono font-bold text-green-700">{r.reportCode}</span>
+                            <span>{fmtDate(r.arrivalDateTime)}</span>
+                            <span className="text-gray-400">|</span>
+                            <span>{r.technicianName}</span>
+                            <span className="ml-auto"><StatusBadge status={r.status} /></span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1126,7 +1571,7 @@ function AdminDashboardInner() {
     if (statsFilter) {
       filtered = filtered.filter((o) => {
         if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "closed" && o.status !== "cancelled";
-        if (statsFilter === "activeJobs") return o.status === "active" || o.status === "in-progress";
+        if (statsFilter === "activeJobs") return o.status === "pc-review";
         if (statsFilter === "projectsThisMonth") {
           const now = new Date();
           const d = new Date(o.arrivalDateTime);
