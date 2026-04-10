@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YECL Maintenance System — Frontend
 
-## Getting Started
+Web frontend cho hệ thống quản lý bảo trì thang máy Yoma Elevator (YECL). Bao gồm giao diện báo cáo bảo trì cho kỹ thuật viên và dashboard quản trị cho các phòng ban.
 
-First, run the development server:
+## Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 16** (App Router, Turbopack)
+- **React 19** + TypeScript
+- **Tailwind CSS 4**
+- **React Hook Form** + Zod (form validation)
+- **jsPDF** + jspdf-autotable (xuất báo cáo PDF)
+- **SheetJS (xlsx)** (xuất Excel)
+
+## Cấu trúc thư mục
+
+```
+frontend-next/
+├── app/
+│   ├── layout.tsx          # Root layout (Barlow font)
+│   ├── page.tsx            # Trang báo cáo bảo trì (technician)
+│   ├── login/page.tsx      # Trang đăng nhập admin
+│   └── admin/
+│       ├── layout.tsx      # Admin layout (header, navigation)
+│       └── page.tsx        # Admin dashboard
+├── components/
+│   ├── AdminHeader.tsx     # Header cho admin dashboard
+│   ├── BatchUploadModal.tsx # Modal upload hàng loạt
+│   └── SmartTextInput.tsx  # Input thông minh với autocomplete
+├── lib/
+│   ├── admin-auth.ts       # Xử lý authentication (cookie-based)
+│   ├── admin-session-context.tsx # Session context provider
+│   └── permissions.ts      # Role-based permission matrix
+└── public/
+    └── logo.jpg            # Logo Yoma Elevator
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Các trang chính
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Trang báo cáo bảo trì (`/`)
+Form nhiều bước cho kỹ thuật viên ghi nhận báo cáo bảo trì:
+1. Thông tin cơ bản (tòa nhà, thiết bị)
+2. Checklist kiểm tra
+3. Ảnh chụp & ghi chú
+4. Vấn đề & vật tư sử dụng
+5. Xem lại & gửi
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Trang đăng nhập admin (`/login`)
+Xác thực email/password cho quản trị viên.
 
-## Learn More
+### Dashboard admin (`/admin`)
+Bảng điều khiển quản lý work order với các tính năng:
+- Xem danh sách work order (bảng, filter, search)
+- Xem chi tiết work order (checklist, ghi chú, chữ ký)
+- Duyệt/chuyển trạng thái theo quy trình
+- Xuất báo cáo PDF và Excel
+- Upload work order hàng loạt
 
-To learn more about Next.js, take a look at the following resources:
+## Hệ thống phân quyền
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Phân quyền theo role và trạng thái work order:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Role | Mô tả |
+|------|--------|
+| `operation` | Tiếp nhận báo cáo, chuyển sang PC Review |
+| `pc-team` | Kiểm tra kỹ thuật, duyệt sang Commercial |
+| `commercial` | Duyệt thương mại, xuất hóa đơn |
+| `mnt-manager` | Quản lý bảo trì, giám sát quy trình |
 
-## Deploy on Vercel
+Quy trình duyệt: **Received → PC Review → Commercial Review → Invoice Ready → Closed**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Cài đặt & Chạy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# Cài dependencies
+npm install
+
+# Chạy development server
+npm run dev
+
+# Build production
+npm run build
+
+# Chạy production
+npm start
+```
+
+Mặc định chạy tại `http://localhost:3000`.
+
+## Biến môi trường
+
+| Biến | Mô tả | Mặc định |
+|------|--------|----------|
+| `NEXT_PUBLIC_API_BASE_URL` | URL backend API | `http://localhost:3001/api` |
+
+## Deploy
+
+Đang deploy trên **Vercel** tại: https://elevator-fe-kappa.vercel.app

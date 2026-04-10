@@ -65,6 +65,7 @@ interface WorkOrderDetail extends WorkOrder {
     categories: Array<{ category: string; items: Array<{ label: string; checked: boolean; status?: string }> }> } | null;
   remarks: string | null;
   internalNotes: Array<{ id: string; at: string; author: string; kind: string; text: string }> | null;
+  photos: Array<{ name: string; mimeType: string; size: number; dataUrl: string }> | null;
   technicianSignature: string | null;
   customerSignature: string | null;
   assignedTo: string | null; updatedAt: string;
@@ -961,6 +962,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
   const [tab, setTab] = useState<"info" | "notes" | "mmpr">("info");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [lightbox, setLightbox] = useState<{ index: number; photos: Array<{ dataUrl: string; name: string }> } | null>(null);
   const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   const [editEquipmentId, setEditEquipmentId] = useState("");
 
@@ -1279,6 +1281,60 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                       ))}</ul>
                     </div>
                   ))}
+                </Section>
+              )}
+              {detail.photos && detail.photos.length > 0 && (
+                <Section title={`Photos (${detail.photos.length})`}>
+                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+                    {detail.photos.map((photo, i) => (
+                      <button key={i} onClick={() => setLightbox({ index: i, photos: detail.photos! })} className="group flex-shrink-0 w-36 rounded-lg overflow-hidden border border-gray-200 hover:border-green-400 transition-all hover:shadow-md text-left cursor-zoom-in" style={{ scrollSnapAlign: "start" }}>
+                        <img src={photo.dataUrl} alt={photo.name} className="w-full h-28 object-cover bg-gray-50 group-hover:scale-105 transition-transform duration-200" />
+                        <div className="px-2 py-1.5 bg-white">
+                          <p className="text-[11px] text-gray-600 truncate">{photo.name}</p>
+                          <p className="text-[10px] text-gray-400">{(photo.size / 1024).toFixed(0)} KB</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </Section>
+              )}
+              {lightbox && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center overlay-fade" style={{ backgroundColor: "rgba(0,0,0,0.85)" }} onClick={() => setLightbox(null)}>
+                  <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/40 hover:bg-black/60 rounded-full w-10 h-10 flex items-center justify-center transition-all z-10">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                  </button>
+                  <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium bg-black/40 px-3 py-1.5 rounded-lg whitespace-nowrap">
+                    {lightbox.photos[lightbox.index].name} — {lightbox.index + 1} / {lightbox.photos.length}
+                  </p>
+                  {lightbox.photos.length > 1 && (
+                    <>
+                      <button onClick={e => { e.stopPropagation(); setLightbox(prev => prev ? { ...prev, index: (prev.index - 1 + prev.photos.length) % prev.photos.length } : null); }} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-black/40 hover:bg-black/60 rounded-full w-10 h-10 flex items-center justify-center transition-all">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4L6 9l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setLightbox(prev => prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : null); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-black/40 hover:bg-black/60 rounded-full w-10 h-10 flex items-center justify-center transition-all">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 4l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                    </>
+                  )}
+                  <img src={lightbox.photos[lightbox.index].dataUrl} alt={lightbox.photos[lightbox.index].name} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" style={{ animation: "slideUp .2s ease" }} onClick={e => e.stopPropagation()} />
+                </div>
+              )}
+              {(detail.technicianSignature || detail.customerSignature) && (
+                <Section title="Signatures">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {detail.technicianSignature && (
+                      <div className="border border-gray-200 rounded-lg p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Technician Signature</p>
+                        <img src={detail.technicianSignature} alt="Technician Signature" className="w-full h-24 object-contain bg-gray-50 rounded" />
+                      </div>
+                    )}
+                    {detail.customerSignature && (
+                      <div className="border border-gray-200 rounded-lg p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Customer Signature</p>
+                        <img src={detail.customerSignature} alt="Customer Signature" className="w-full h-24 object-contain bg-gray-50 rounded" />
+                      </div>
+                    )}
+                  </div>
                 </Section>
               )}
             </div>
