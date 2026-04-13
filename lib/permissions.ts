@@ -14,6 +14,7 @@ export const ADMIN_ROLES = [
   "mnt-manager",
   "pc-team",
   "commercial",
+  "management",
 ] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
@@ -68,6 +69,13 @@ const PERMISSIONS: Record<
     "comm-review": ["review", "approve", "comment"],
     "invoice-ready": ["view", "approve", "download"],
     closed: ["view", "download"],
+  },
+  management: {
+    received: ["view"],
+    "pc-review": ["view"],
+    "comm-review": ["view"],
+    "invoice-ready": ["view"],
+    closed: ["view"],
   },
 };
 

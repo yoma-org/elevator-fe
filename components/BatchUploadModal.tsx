@@ -100,15 +100,15 @@ function mapRowToPayload(data: Record<string, string>, mode: UploadMode) {
       name: data["Building Name"]?.trim() ?? "",
       code: data["Building Code"]?.trim() ?? "",
       address: data["Address"]?.trim() ?? "",
-      contactName: data["Contact Name"]?.trim() ?? "",
-      contactPhone: data["Contact Phone"]?.trim() ?? "",
+      contact_name: data["Contact Name"]?.trim() ?? "",
+      contact_phone: data["Contact Phone"]?.trim() ?? "",
     };
   }
   return {
     buildingName: data["Building Name"]?.trim() ?? "",
-    equipmentType: data["Equipment Type"]?.trim() ?? "",
-    equipmentCode: data["Equipment Code"]?.trim() ?? "",
-    serialNumber: data["Serial Number"]?.trim() ?? "",
+    equipment_type: data["Equipment Type"]?.trim() ?? "",
+    equipment_code: data["Equipment Code"]?.trim() ?? "",
+    serial_number: data["Serial Number"]?.trim() ?? "",
     brand: data["Brand"]?.trim() ?? "",
     model: data["Model"]?.trim() ?? "",
     location: data["Location"]?.trim() ?? "",

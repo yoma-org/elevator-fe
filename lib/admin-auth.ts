@@ -65,6 +65,7 @@ export function formatAdminRole(value?: string | null) {
     "mnt-manager": "MNT Manager",
     "pc-team": "PC Team",
     commercial: "Commercial",
+    management: "Management",
   };
   const role = normalizeAdminRole(value);
   return LABELS[role] ?? role;

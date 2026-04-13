@@ -52,28 +52,28 @@ const ANIM_STYLES = `
 // ─── types ─────────────────────────────────────────────────────────────────────
 
 interface WorkOrder {
-  id: string; building: string; equipmentCode: string; equipmentType: string;
-  status: string; maintenanceType: string; technicianName: string;
-  arrivalDateTime: string; findings: string | null; workPerformed: string | null;
-  partsUsed: Array<{ name: string; quantity: number }> | null;
-  priority: string; submittedAt: string; createdAt: string;
+  id: string; building: string; equipment_code: string; equipment_type: string;
+  status: string; maintenance_type: string; technician_name: string;
+  arrival_date_time: string; findings: string | null; work_performed: string | null;
+  parts_used: Array<{ name: string; quantity: number; status?: 'replaced' | 'needs-replacement' }> | null;
+  priority: string; submitted_at: string; created_at: string;
 }
 
 interface WorkOrderDetail extends WorkOrder {
-  buildingId: string; equipmentId: string;
-  checklistResults: { equipmentType: string | null; templateName?: string | null; checkedCount: number; totalCount: number;
+  building_id: string; equipmentId: string;
+  checklist_results: { equipment_type: string | null; templateName?: string | null; checkedCount: number; totalCount: number;
     categories: Array<{ category: string; items: Array<{ label: string; checked: boolean; status?: string }> }> } | null;
   remarks: string | null;
-  internalNotes: Array<{ id: string; at: string; author: string; kind: string; text: string }> | null;
+  internal_notes: Array<{ id: string; at: string; author: string; kind: string; text: string }> | null;
   photos: Array<{ name: string; mimeType: string; size: number; dataUrl: string }> | null;
-  technicianSignature: string | null;
-  customerSignature: string | null;
-  assignedTo: string | null; updatedAt: string;
+  technician_signature: string | null;
+  customer_signature: string | null;
+  assigned_to: string | null; updated_at: string;
 }
 
 interface Stats { myQueue: number; projectsThisMonth: number; activeJobs: number; avgResponseTimeMin: number; avgWorkDurationHrs: number; }
 interface BuildingItem { id: string; name: string; }
-interface EquipmentItem { id: string; equipmentCode: string; equipmentType: string; location: string | null; }
+interface EquipmentItem { id: string; equipment_code: string; equipment_type: string; location: string | null; }
 
 // ─── status config ─────────────────────────────────────────────────────────────
 
@@ -174,10 +174,10 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   autoTable(doc, {
     startY: y,
     body: [
-      ["ELE Type", d.equipmentType ?? "—", "Report Code", d.id ?? "—", "Status", getStatusCfg(d.status).label],
-      ["Building", d.building ?? "—", "Car / Lift No.", d.equipmentCode ?? "—", "Priority", d.priority ?? "—"],
-      ["Maintenance Type", d.maintenanceType ?? "—", "Technician", d.technicianName ?? "—", "Assigned To", d.assignedTo ?? "—"],
-      ["Arrival Date", d.arrivalDateTime ? fmtDate(d.arrivalDateTime) : "—", "Arrival Time", d.arrivalDateTime ? fmtTime(d.arrivalDateTime) : "—", "Submitted", d.submittedAt ? fmtDate(d.submittedAt) : "—"],
+      ["ELE Type", d.equipment_type ?? "—", "Report Code", d.id ?? "—", "Status", getStatusCfg(d.status).label],
+      ["Building", d.building ?? "—", "Car / Lift No.", d.equipment_code ?? "—", "Priority", d.priority ?? "—"],
+      ["Maintenance Type", d.maintenance_type ?? "—", "Technician", d.technician_name ?? "—", "Assigned To", d.assigned_to ?? "—"],
+      ["Arrival Date", d.arrival_date_time ? fmtDate(d.arrival_date_time) : "—", "Arrival Time", d.arrival_date_time ? fmtTime(d.arrival_date_time) : "—", "Submitted", d.submitted_at ? fmtDate(d.submitted_at) : "—"],
     ],
     theme: "grid",
     styles: { fontSize: 8, cellPadding: 2.5 },
@@ -196,28 +196,36 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   // ═══════════════════════════════════════════════════════════════════════════════
   // 2. PARTS REPLACEMENT RECORD
   // ═══════════════════════════════════════════════════════════════════════════════
-  if (d.partsUsed && d.partsUsed.length > 0) {
+  if (d.parts_used && d.parts_used.length > 0) {
     sectionTitle("2", "Parts Replacement Record");
 
     autoTable(doc, {
       startY: y,
-      head: [["No.", "Name of Part", "Qty", "Replaced By", "Date"]],
-      body: d.partsUsed.map((p, i) => [
+      head: [["No.", "Name of Part", "Qty", "Status", "Replaced By", "Date"]],
+      body: d.parts_used.map((p, i) => [
         String(i + 1),
         p.name,
         String(p.quantity),
-        d.technicianName ?? "—",
-        d.arrivalDateTime ? fmtDate(d.arrivalDateTime) : "—",
+        p.status === "needs-replacement" ? "Needs Replacement" : "Replaced",
+        d.technician_name ?? "—",
+        d.arrival_date_time ? fmtDate(d.arrival_date_time) : "—",
       ]),
       theme: "grid",
       headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
       styles: { fontSize: 8, cellPadding: 2.5 },
       columnStyles: {
         0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 100 },
-        2: { cellWidth: 18, halign: "center" },
-        3: { cellWidth: 50 },
-        4: { cellWidth: 35, halign: "center" },
+        1: { cellWidth: 80 },
+        2: { cellWidth: 16, halign: "center" },
+        3: { cellWidth: 38 },
+        4: { cellWidth: 40 },
+        5: { cellWidth: 30, halign: "center" },
+      },
+      didParseCell: (data: any) => {
+        if (data.section === "body" && data.column.index === 3 && data.cell.text[0] === "Needs Replacement") {
+          data.cell.styles.textColor = [180, 83, 9];
+          data.cell.styles.fontStyle = "bold";
+        }
       },
       margin: { left: mx, right: mx },
     });
@@ -227,8 +235,8 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   // ═══════════════════════════════════════════════════════════════════════════════
   // 3. MAINTENANCE RECORD (Checklist)
   // ═══════════════════════════════════════════════════════════════════════════════
-  if (d.checklistResults && d.checklistResults.categories.length > 0) {
-    const cr = d.checklistResults;
+  if (d.checklist_results && d.checklist_results.categories.length > 0) {
+    const cr = d.checklist_results;
     sectionTitle("3", `Maintenance Record — Checklist (${cr.checkedCount}/${cr.totalCount})`);
 
     // Legend
@@ -282,12 +290,12 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   // ═══════════════════════════════════════════════════════════════════════════════
   // 4. FINDINGS & WORK PERFORMED
   // ═══════════════════════════════════════════════════════════════════════════════
-  if (d.findings || d.workPerformed) {
+  if (d.findings || d.work_performed) {
     sectionTitle("4", "Findings & Work Performed");
 
     const rows: string[][] = [];
     if (d.findings) rows.push(["Findings", d.findings]);
-    if (d.workPerformed) rows.push(["Work Performed", d.workPerformed]);
+    if (d.work_performed) rows.push(["Work Performed", d.work_performed]);
 
     autoTable(doc, {
       startY: y,
@@ -428,7 +436,7 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   // ═══════════════════════════════════════════════════════════════════════════════
   // SIGNATURES
   // ═══════════════════════════════════════════════════════════════════════════════
-  if (d.technicianSignature || d.customerSignature) {
+  if (d.technician_signature || d.customer_signature) {
     sectionTitle(String(sectionNum), "Signatures");
 
     const sigW = 70;
@@ -447,20 +455,20 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...GRAY);
     doc.text("Technician Signature", leftX + 3, y + 5);
-    if (d.technicianSignature) {
-      try { doc.addImage(d.technicianSignature, "PNG", leftX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
+    if (d.technician_signature) {
+      try { doc.addImage(d.technician_signature, "PNG", leftX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
     }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    doc.text(d.technicianName ?? "", leftX + 3, y + sigH + 11);
+    doc.text(d.technician_name ?? "", leftX + 3, y + sigH + 11);
 
     // Customer signature (right)
     doc.rect(rightX, y, colW - 4, sigH + 14);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     doc.text("Customer Signature", rightX + 3, y + 5);
-    if (d.customerSignature) {
-      try { doc.addImage(d.customerSignature, "PNG", rightX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
+    if (d.customer_signature) {
+      try { doc.addImage(d.customer_signature, "PNG", rightX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
     }
 
     y += sigH + 20;
@@ -684,7 +692,7 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
       <div className="flex items-center justify-between mb-3 gap-2 pl-1">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-sm font-bold text-gray-800 font-mono tracking-tight truncate">{order.id ?? "—"}</span>
-          <span className="hidden sm:inline text-[10px] text-gray-400 font-medium px-1.5 py-0.5 bg-gray-100 rounded">{order.equipmentType}</span>
+          <span className="hidden sm:inline text-[10px] text-gray-400 font-medium px-1.5 py-0.5 bg-gray-100 rounded">{order.equipment_type}</span>
         </div>
         <div className="flex items-center gap-2">
           {isHighPrio && (
@@ -705,21 +713,21 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
         </div>
         <div className="flex items-center gap-1.5">
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><rect x="3" y="1" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M5 8h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
-          <span className="text-gray-700 font-medium">{order.equipmentCode}</span>
+          <span className="text-gray-700 font-medium">{order.equipment_code}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><circle cx="6" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.1"/><path d="M1.5 11c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" stroke="currentColor" strokeWidth="1.1"/></svg>
-          <span className="text-gray-700 font-medium">{order.technicianName}</span>
+          <span className="text-gray-700 font-medium">{order.technician_name}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.1"/><path d="M6 3v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
-          <span className="text-gray-700 font-medium">{fmtDate(order.arrivalDateTime)} {fmtTime(order.arrivalDateTime)}</span>
+          <span className="text-gray-700 font-medium">{fmtDate(order.arrival_date_time)} {fmtTime(order.arrival_date_time)}</span>
         </div>
       </div>
 
       {/* Maintenance type tag */}
       <div className="flex items-center gap-2 mb-3 pl-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{order.maintenanceType}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{order.maintenance_type}</span>
       </div>
 
       {/* Findings preview */}
@@ -727,9 +735,17 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
         <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed border-l-2 border-gray-200 pl-2.5">{order.findings}</p>
       )}
 
+      {/* Needs Replacement indicator */}
+      {order.parts_used?.some(p => p.status === "needs-replacement") && (
+        <div className="flex items-center gap-1.5 mb-3 pl-1 py-1.5 px-2.5 rounded-lg bg-amber-50 border border-amber-200">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" stroke="#d97706" strokeWidth="1.3" strokeLinejoin="round"/><path d="M8 6v3.5M8 12v.5" stroke="#d97706" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Parts Need Replacement</span>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-100 pl-1">
-        <span className="text-[10px] text-gray-400">{order.submittedAt ? `Submitted ${fmtDate(order.submittedAt)}` : ""}</span>
+        <span className="text-[10px] text-gray-400">{order.submitted_at ? `Submitted ${fmtDate(order.submitted_at)}` : ""}</span>
         <span className="text-xs text-green-700 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
           View details
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L7 5l-3.5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -744,7 +760,7 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
 function AddProjectModal({ onClose, onCreated, token }: { onClose: () => void; onCreated: (msg: string) => void; token?: string | null }) {
   const [buildings, setBuildings] = useState<BuildingItem[]>([]);
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
-  const [buildingId, setBuildingId] = useState("");
+  const [building_id, setBuildingId] = useState("");
   const [equipmentId, setEquipmentId] = useState("");
   const [calledPerson, setCalledPerson] = useState("");
   const [calledTime, setCalledTime] = useState("");
@@ -757,25 +773,25 @@ function AddProjectModal({ onClose, onCreated, token }: { onClose: () => void; o
   }, []);
 
   useEffect(() => {
-    if (!buildingId) { setEquipment([]); setEquipmentId(""); return; }
-    fetch(`${API_BASE}/equipment/by-building?buildingId=${buildingId}`).then(r => r.json()).then(res => { setEquipment(res?.data ?? res); setEquipmentId(""); }).catch(console.error);
-  }, [buildingId]);
+    if (!building_id) { setEquipment([]); setEquipmentId(""); return; }
+    fetch(`${API_BASE}/equipment/by-building?building_id=${building_id}`).then(r => r.json()).then(res => { setEquipment(res?.data ?? res); setEquipmentId(""); }).catch(console.error);
+  }, [building_id]);
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     setError("");
-    if (!buildingId || !equipmentId || !calledPerson || !calledTime || !issue) { setError("Please fill in all required fields."); return; }
+    if (!building_id || !equipmentId || !calledPerson || !calledTime || !issue) { setError("Please fill in all required fields."); return; }
     setSubmitting(true);
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/maintenance-reports/admin/cbs-call`, {
         method: "POST", headers,
-        body: JSON.stringify({ buildingId, equipmentId, calledPerson, calledTime, issue }),
+        body: JSON.stringify({ building_id, equipmentId, calledPerson, calledTime, issue }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d?.message ?? "Failed to create CBS Call"); }
       const data = await res.json();
-      onCreated(`CBS Call created: ${data.reportCode}`);
+      onCreated(`CBS Call created: ${data.report_code}`);
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -799,7 +815,7 @@ function AddProjectModal({ onClose, onCreated, token }: { onClose: () => void; o
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Building Name <span className="text-red-500">*</span></label>
-            <select value={buildingId} onChange={e => setBuildingId(e.target.value)} className={inputCls} style={{ borderColor: buildingId ? "#16a34a" : undefined }}>
+            <select value={building_id} onChange={e => setBuildingId(e.target.value)} className={inputCls} style={{ borderColor: building_id ? "#16a34a" : undefined }}>
               <option value="">Select building...</option>
               {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -807,9 +823,9 @@ function AddProjectModal({ onClose, onCreated, token }: { onClose: () => void; o
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Lift No. <span className="text-red-500">*</span></label>
-            <select value={equipmentId} onChange={e => setEquipmentId(e.target.value)} disabled={!buildingId} className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}>
+            <select value={equipmentId} onChange={e => setEquipmentId(e.target.value)} disabled={!building_id} className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}>
               <option value="">Select lift...</option>
-              {equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.equipmentCode}{eq.location ? ` — ${eq.location}` : ""}</option>)}
+              {equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.equipment_code}{eq.location ? ` — ${eq.location}` : ""}</option>)}
             </select>
           </div>
 
@@ -986,7 +1002,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
   function startEditing() {
     if (!detail) return;
     setEditEquipmentId(detail.equipmentId);
-    fetch(`${API_BASE}/equipment/by-building?buildingId=${detail.buildingId}`, { headers: authHeaders })
+    fetch(`${API_BASE}/equipment/by-building?building_id=${detail.building_id}`, { headers: authHeaders })
       .then(r => r.json())
       .then(res => { const list = res?.data ?? res; setEquipmentList(Array.isArray(list) ? list : []); })
       .catch(() => setEquipmentList([]));
@@ -1093,7 +1109,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   <button
                     onClick={async () => {
                       try {
-                        const mmpr = await fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${new Date(detail.arrivalDateTime).getFullYear()}`, { headers: authHeaders }).then(r => r.json());
+                        const mmpr = await fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${new Date(detail.arrival_date_time).getFullYear()}`, { headers: authHeaders }).then(r => r.json());
                         downloadReportPdf(detail, mmpr);
                         onToast("MMPR generated", "success");
                       } catch { downloadReportPdf(detail); onToast("MMPR generated (without MMPR data)", "success"); }
@@ -1129,8 +1145,8 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                 <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/><path d="M7 5v1M7 7.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>Details</>
               ) : t === "notes" ? (
                 <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h10v7H5l-3 2V3z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5 6h4M5 8h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>Activity
-                {detail && detail.internalNotes && detail.internalNotes.length > 0 && (
-                  <span className="text-[10px] font-bold bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{detail.internalNotes.length}</span>
+                {detail && detail.internal_notes && detail.internal_notes.length > 0 && (
+                  <span className="text-[10px] font-bold bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{detail.internal_notes.length}</span>
                 )}
                 </>
               ) : (
@@ -1188,13 +1204,13 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   <InfoRow label="Report Code" value={detail.id ?? "—"} />
                   <InfoRow label="Status" value={getStatusCfg(detail.status).label} />
                   <InfoRow label="Building Name" value={detail.building} />
-                  <InfoRow label="Lift No." value={detail.equipmentCode} />
-                  <InfoRow label="Equipment Type" value={detail.equipmentType} />
-                  <InfoRow label="Maintenance Type" value={detail.maintenanceType} />
-                  <InfoRow label="Technician" value={detail.technicianName} />
-                  <InfoRow label="Assigned To" value={detail.assignedTo ?? "—"} />
-                  <InfoRow label="Arrival Date" value={fmtDate(detail.arrivalDateTime)} />
-                  <InfoRow label="Arrival Time" value={fmtTime(detail.arrivalDateTime)} />
+                  <InfoRow label="Lift No." value={detail.equipment_code} />
+                  <InfoRow label="Equipment Type" value={detail.equipment_type} />
+                  <InfoRow label="Maintenance Type" value={detail.maintenance_type} />
+                  <InfoRow label="Technician" value={detail.technician_name} />
+                  <InfoRow label="Assigned To" value={detail.assigned_to ?? "—"} />
+                  <InfoRow label="Arrival Date" value={fmtDate(detail.arrival_date_time)} />
+                  <InfoRow label="Arrival Time" value={fmtTime(detail.arrival_date_time)} />
                   <InfoRow label="Priority" value={detail.priority} />
                 </div>
               </Section>
@@ -1217,7 +1233,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                     <div className="space-y-3">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                         <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Original</p>
-                        <p className="text-sm text-gray-700">{detail.equipmentType} — {detail.equipmentCode}</p>
+                        <p className="text-sm text-gray-700">{detail.equipment_type} — {detail.equipment_code}</p>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Equipment (Lift No.) <span className="text-red-500">*</span></label>
@@ -1226,7 +1242,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                         ) : (
                           <select value={editEquipmentId} onChange={e => setEditEquipmentId(e.target.value)} className={editInputCls + " bg-white"}>
                             {equipmentList.map(eq => (
-                              <option key={eq.id} value={eq.id}>{eq.equipmentType} — {eq.equipmentCode}{eq.location ? ` (${eq.location})` : ""}</option>
+                              <option key={eq.id} value={eq.id}>{eq.equipment_type} — {eq.equipment_code}{eq.location ? ` (${eq.location})` : ""}</option>
                             ))}
                           </select>
                         )}
@@ -1234,7 +1250,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                       {selectedEquipment && hasChanges && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                           <p className="text-xs font-semibold text-amber-600 uppercase mb-1">Changed to</p>
-                          <p className="text-sm text-amber-800">{selectedEquipment.equipmentType} — {selectedEquipment.equipmentCode}</p>
+                          <p className="text-sm text-amber-800">{selectedEquipment.equipment_type} — {selectedEquipment.equipment_code}</p>
                         </div>
                       )}
                     </div>
@@ -1249,7 +1265,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
               )}
 
               {detail.findings && <Section title="Issue Description"><p className="text-sm text-gray-700 leading-relaxed">{detail.findings}</p></Section>}
-              {detail.workPerformed && <Section title="Action Taken"><p className="text-sm text-gray-700 leading-relaxed">{detail.workPerformed}</p></Section>}
+              {detail.work_performed && <Section title="Action Taken"><p className="text-sm text-gray-700 leading-relaxed">{detail.work_performed}</p></Section>}
               {detail.remarks && <Section title="Remarks"><p className="text-sm text-gray-700 leading-relaxed">{detail.remarks}</p></Section>}
               {!editing && isEditable && (
                 <button onClick={startEditing} className="btn-green px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ backgroundColor: "#1a7a4a" }}>
@@ -1258,20 +1274,48 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                 </button>
               )}
 
-              {detail.partsUsed && detail.partsUsed.length > 0 && (
-                <Section title="Parts Replaced">
-                  <ul className="space-y-1">{detail.partsUsed.map((p,i) => <li key={i} className="text-sm text-gray-700">{p.name} &times; {p.quantity}</li>)}</ul>
-                </Section>
-              )}
-              {detail.checklistResults && (
+              {detail.parts_used && detail.parts_used.length > 0 && (() => {
+                const hasNeedsReplacement = detail.parts_used.some(p => p.status === "needs-replacement");
+                return hasNeedsReplacement ? (
+                  <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4" style={{ animation: "fadeIn .3s ease" }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L1 16h16L9 1.5z" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 7v3.5M9 13v.5" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      <h3 className="text-sm font-bold text-amber-800 uppercase tracking-wide">Parts — Needs Replacement</h3>
+                    </div>
+                    <p className="text-xs text-amber-700 mb-3">The following parts have been flagged for replacement. Please reach out to the customer with spare part quotations.</p>
+                    <ul className="space-y-2">{detail.parts_used.map((p,i) => (
+                      <li key={i} className={`text-sm flex items-center gap-2 rounded-lg px-3 py-2 ${
+                        p.status === "needs-replacement"
+                          ? "bg-amber-100 border border-amber-300 text-amber-800 font-semibold"
+                          : "bg-white border border-gray-200 text-gray-700"
+                      }`}>
+                        {p.status === "needs-replacement" && (
+                          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-500" />
+                        )}
+                        {p.name} &times; {p.quantity}
+                        {p.status === "needs-replacement" && (
+                          <span className="ml-auto text-[10px] font-bold text-amber-600 uppercase tracking-wide">Action Required</span>
+                        )}
+                      </li>
+                    ))}</ul>
+                  </div>
+                ) : (
+                  <Section title="Parts">
+                    <ul className="space-y-1.5">{detail.parts_used.map((p,i) => (
+                      <li key={i} className="text-sm text-gray-700">{p.name} &times; {p.quantity}</li>
+                    ))}</ul>
+                  </Section>
+                );
+              })()}
+              {detail.checklist_results && (
                 <Section title="Checklist Results">
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="text-sm text-gray-600">{detail.checklistResults.checkedCount} / {detail.checklistResults.totalCount} items checked</span>
+                    <span className="text-sm text-gray-600">{detail.checklist_results.checkedCount} / {detail.checklist_results.totalCount} items checked</span>
                     <span className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <span className="h-full bg-green-500 rounded-full block" style={{ width: `${Math.round(detail.checklistResults.checkedCount / Math.max(detail.checklistResults.totalCount, 1) * 100)}%`, transition: "width .4s ease" }} />
+                      <span className="h-full bg-green-500 rounded-full block" style={{ width: `${Math.round(detail.checklist_results.checkedCount / Math.max(detail.checklist_results.totalCount, 1) * 100)}%`, transition: "width .4s ease" }} />
                     </span>
                   </div>
-                  {detail.checklistResults.categories.map((cat, ci) => (
+                  {detail.checklist_results.categories.map((cat, ci) => (
                     <div key={ci} className="mb-3">
                       <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{cat.category}</p>
                       <ul className="space-y-0.5">{cat.items.map((item, ii) => (
@@ -1319,19 +1363,19 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   <img src={lightbox.photos[lightbox.index].dataUrl} alt={lightbox.photos[lightbox.index].name} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" style={{ animation: "slideUp .2s ease" }} onClick={e => e.stopPropagation()} />
                 </div>
               )}
-              {(detail.technicianSignature || detail.customerSignature) && (
+              {(detail.technician_signature || detail.customer_signature) && (
                 <Section title="Signatures">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {detail.technicianSignature && (
+                    {detail.technician_signature && (
                       <div className="border border-gray-200 rounded-lg p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Technician Signature</p>
-                        <img src={detail.technicianSignature} alt="Technician Signature" className="w-full h-24 object-contain bg-gray-50 rounded" />
+                        <img src={detail.technician_signature} alt="Technician Signature" className="w-full h-24 object-contain bg-gray-50 rounded" />
                       </div>
                     )}
-                    {detail.customerSignature && (
+                    {detail.customer_signature && (
                       <div className="border border-gray-200 rounded-lg p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Customer Signature</p>
-                        <img src={detail.customerSignature} alt="Customer Signature" className="w-full h-24 object-contain bg-gray-50 rounded" />
+                        <img src={detail.customer_signature} alt="Customer Signature" className="w-full h-24 object-contain bg-gray-50 rounded" />
                       </div>
                     )}
                   </div>
@@ -1342,7 +1386,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
             <div style={{ animation: "fadeIn .2s ease" }}>
               {/* Notes timeline */}
               <div className="space-y-0">
-                {!detail.internalNotes || detail.internalNotes.length === 0
+                {!detail.internal_notes || detail.internal_notes.length === 0
                   ? (
                     <div className="text-center py-12">
                       <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
@@ -1351,7 +1395,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                       <p className="text-sm text-gray-400">No activity yet.</p>
                     </div>
                   )
-                  : [...detail.internalNotes].sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime()).map((note, i, arr) => (
+                  : [...detail.internal_notes].sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime()).map((note, i, arr) => (
                     <div key={note.id} className="flex gap-3 group">
                       {/* Timeline line */}
                       <div className="flex flex-col items-center flex-shrink-0">
@@ -1379,7 +1423,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
             /* MMPR Tab */
             <div style={{ animation: "fadeIn .2s ease" }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-gray-800">MMPR Data — {detail.equipmentCode}</h3>
+                <h3 className="text-sm font-bold text-gray-800">MMPR Data — {detail.equipment_code}</h3>
                 <div className="flex items-center gap-2">
                   <select value={mmprYear} onChange={e => setMmprYear(Number(e.target.value))} className="border border-gray-300 rounded-lg px-2 py-1 text-sm">
                     {[2024, 2025, 2026, 2027].map(yr => <option key={yr} value={yr}>{yr}</option>)}
@@ -1492,10 +1536,10 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                       <div className="space-y-2">
                         {mmprData.reports.map((r: any, i: number) => (
                           <div key={i} className="flex items-center gap-3 text-xs text-gray-700 py-1.5 border-b border-gray-100 last:border-0">
-                            <span className="font-mono font-bold text-green-700">{r.reportCode}</span>
-                            <span>{fmtDate(r.arrivalDateTime)}</span>
+                            <span className="font-mono font-bold text-green-700">{r.report_code}</span>
+                            <span>{fmtDate(r.arrival_date_time)}</span>
                             <span className="text-gray-400">|</span>
-                            <span>{r.technicianName}</span>
+                            <span>{r.technician_name}</span>
                             <span className="ml-auto"><StatusBadge status={r.status} /></span>
                           </div>
                         ))}
@@ -1512,7 +1556,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
         {tab === "notes" && detail && (can(role, detail.status, "comment") || can(role, detail.status, "review")) && (
           <div className="border-t border-gray-200 bg-white p-4 rounded-b-2xl">
             <NoteForm code={code} token={token} authorName={userName} onAdded={(note) => {
-              setDetail(prev => prev ? { ...prev, internalNotes: [...(prev.internalNotes ?? []), note] } : prev);
+              setDetail(prev => prev ? { ...prev, internal_notes: [...(prev.internal_notes ?? []), note] } : prev);
               onToast("Note added", "success");
             }} />
           </div>
@@ -1599,10 +1643,10 @@ function AdminDashboardInner() {
   useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
 
   const uniqueBuildings = useMemo(() => [...new Set(orders.map(o => o.building).filter(Boolean))].sort(), [orders]);
-  const uniqueProjectNames = useMemo(() => [...new Set(orders.map(o => o.maintenanceType).filter(Boolean))].sort(), [orders]);
+  const uniqueProjectNames = useMemo(() => [...new Set(orders.map(o => o.maintenance_type).filter(Boolean))].sort(), [orders]);
   const uniqueParts = useMemo(() => {
     const names = new Set<string>();
-    orders.forEach(o => o.partsUsed?.forEach(p => { if (p.name.trim()) names.add(p.name.trim()); }));
+    orders.forEach(o => o.parts_used?.forEach(p => { if (p.name.trim()) names.add(p.name.trim()); }));
     return [...names].sort();
   }, [orders]);
   const uniqueReportCodes = useMemo(() => orders.map(o => o.id).filter(Boolean).sort(), [orders]);
@@ -1617,11 +1661,11 @@ function AdminDashboardInner() {
     }
     if (debouncedProject) {
       const q = debouncedProject.toLowerCase();
-      filtered = filtered.filter(o => o.maintenanceType?.toLowerCase().includes(q) || o.id?.toLowerCase().includes(q));
+      filtered = filtered.filter(o => o.maintenance_type?.toLowerCase().includes(q) || o.id?.toLowerCase().includes(q));
     }
     if (debouncedParts) {
       const q = debouncedParts.toLowerCase();
-      filtered = filtered.filter(o => o.partsUsed?.some(p => p.name.toLowerCase().includes(q)));
+      filtered = filtered.filter(o => o.parts_used?.some(p => p.name.toLowerCase().includes(q)));
     }
 
     if (statsFilter) {
@@ -1630,14 +1674,14 @@ function AdminDashboardInner() {
         if (statsFilter === "activeJobs") return o.status === "pc-review";
         if (statsFilter === "projectsThisMonth") {
           const now = new Date();
-          const d = new Date(o.arrivalDateTime);
+          const d = new Date(o.arrival_date_time);
           return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
         }
         return true;
       });
     }
 
-    return [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return [...filtered].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [orders, debouncedSearch, debouncedBuilding, debouncedProject, debouncedParts, statsFilter]);
 
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
@@ -1677,18 +1721,18 @@ function AdminDashboardInner() {
                 const rows = orders.map((o) => ({
                   "Report Code": o.id ?? "",
                   "Building": o.building ?? "",
-                  "Equipment Code": o.equipmentCode ?? "",
-                  "Equipment Type": o.equipmentType ?? "",
+                  "Equipment Code": o.equipment_code ?? "",
+                  "Equipment Type": o.equipment_type ?? "",
                   "Status": getStatusCfg(o.status).label,
-                  "Maintenance Type": o.maintenanceType ?? "",
-                  "Technician": o.technicianName ?? "",
-                  "Arrival Date": o.arrivalDateTime ? fmtDate(o.arrivalDateTime) : "",
-                  "Arrival Time": o.arrivalDateTime ? fmtTime(o.arrivalDateTime) : "",
+                  "Maintenance Type": o.maintenance_type ?? "",
+                  "Technician": o.technician_name ?? "",
+                  "Arrival Date": o.arrival_date_time ? fmtDate(o.arrival_date_time) : "",
+                  "Arrival Time": o.arrival_date_time ? fmtTime(o.arrival_date_time) : "",
                   "Priority": o.priority ?? "",
                   "Findings": o.findings ?? "",
-                  "Work Performed": o.workPerformed ?? "",
-                  "Parts Used": o.partsUsed?.map((p: { name: string; quantity: number }) => `${p.name} x${p.quantity}`).join(", ") ?? "",
-                  "Submitted At": o.submittedAt ? fmtDate(o.submittedAt) : "",
+                  "Work Performed": o.work_performed ?? "",
+                  "Parts Used": o.parts_used?.map((p: { name: string; quantity: number }) => `${p.name} x${p.quantity}`).join(", ") ?? "",
+                  "Submitted At": o.submitted_at ? fmtDate(o.submitted_at) : "",
                 }));
                 const ws = XLSX.utils.json_to_sheet(rows);
                 const wb = XLSX.utils.book_new();
@@ -1837,7 +1881,7 @@ function AdminDashboardInner() {
           {viewMode === "card" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {paginatedOrders.map((order, i) => (
-                <WorkOrderCard key={order.id ?? order.createdAt} order={order} index={i} onClick={() => order.id && setSelectedCode(order.id)} />
+                <WorkOrderCard key={order.id ?? order.created_at} order={order} index={i} onClick={() => order.id && setSelectedCode(order.id)} />
               ))}
             </div>
           ) : (
@@ -1860,19 +1904,29 @@ function AdminDashboardInner() {
                   {paginatedOrders.map((order, i) => {
                     const prio = PRIORITY_COLORS[order.priority] ?? PRIORITY_COLORS.Medium;
                     return (
-                      <tr key={order.id ?? order.createdAt} onClick={() => order.id && setSelectedCode(order.id)}
+                      <tr key={order.id ?? order.created_at} onClick={() => order.id && setSelectedCode(order.id)}
                         className="table-row cursor-pointer border-b border-gray-50 last:border-0"
                         style={{ animation: `fadeIn .2s ${i * 0.02}s ease both` }}>
                         <td className="px-3 py-2.5 font-mono font-bold text-gray-800 text-xs whitespace-nowrap">{order.id ?? "—"}</td>
                         <td className="px-3 py-2.5 text-gray-700 font-medium text-xs">{order.building}</td>
-                        <td className="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell">{order.equipmentCode}</td>
-                        <td className="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell">{order.technicianName}</td>
-                        <td className="px-3 py-2.5"><span className="text-[10px] font-semibold uppercase text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{order.maintenanceType}</span></td>
+                        <td className="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell">{order.equipment_code}</td>
+                        <td className="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell">{order.technician_name}</td>
+                        <td className="px-3 py-2.5"><span className="text-[10px] font-semibold uppercase text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{order.maintenance_type}</span></td>
                         <td className="px-3 py-2.5">
                           <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: prio.bg, color: prio.text }}>{order.priority}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap">{fmtDate(order.arrivalDateTime)}</td>
-                        <td className="px-3 py-2.5"><StatusBadge status={order.status} /></td>
+                        <td className="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap">{fmtDate(order.arrival_date_time)}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge status={order.status} />
+                            {order.parts_used?.some(p => p.status === "needs-replacement") && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 uppercase whitespace-nowrap" title="Parts need replacement">
+                                <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M8 6v3.5M8 12v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                Parts
+                              </span>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}

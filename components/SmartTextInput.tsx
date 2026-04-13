@@ -9,7 +9,7 @@ interface SmartTextInputProps {
   value: string;
   onChange: (value: string) => void;
   field: "findings" | "remarks" | "parts" | "notes";
-  equipmentType?: string;
+  equipment_type?: string;
   placeholder?: string;
   multiline?: boolean;
   className?: string;
@@ -20,7 +20,7 @@ export default function SmartTextInput({
   value,
   onChange,
   field,
-  equipmentType,
+  equipment_type,
   placeholder,
   multiline = true,
   className = "",
@@ -51,7 +51,7 @@ export default function SmartTextInput({
       abortRef.current = controller;
 
       const params = new URLSearchParams({ field, q: query, limit: "5" });
-      if (equipmentType) params.set("equipmentType", equipmentType);
+      if (equipment_type) params.set("equipment_type", equipment_type);
 
       try {
         const res = await fetch(`${API_BASE_URL}/suggestions?${params}`, {
@@ -79,7 +79,7 @@ export default function SmartTextInput({
         // aborted or network error
       }
     },
-    [field, equipmentType],
+    [field, equipment_type],
   );
 
   const handleChange = (

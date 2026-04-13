@@ -4,7 +4,7 @@ import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 
 import SmartTextInput from "../components/SmartTextInput";
 
 type Building = { id: string; name: string };
-type Equipment = { id: string; equipmentType: string; equipmentCode: string };
+type Equipment = { id: string; equipment_type: string; equipment_code: string };
 type PartItem = { name: string; quantity: string };
 type PhotoItem = {
   name: string;
@@ -139,15 +139,15 @@ const getLocalDateTimeParts = (date = new Date()) => {
 };
 
 const createInitialFormData = () => ({
-  buildingId: "",
-  equipmentType: "",
+  building_id: "",
+  equipment_type: "",
   equipmentId: "",
-  maintenanceType: "Scheduled/Preventive Maintenance",
-  arrivalDateTime: getLocalDateTimeParts().dateTime,
-  technicianName: "Ko Aung Mya Oo",
+  maintenance_type: "Scheduled/Preventive Maintenance",
+  arrival_date_time: getLocalDateTimeParts().dateTime,
+  technician_name: "Ko Aung Mya Oo",
   checklistState: {} as Record<string, string[]>,
   issuesFound: "",
-  partsReplaced: "no",
+  partsReplaced: "no-change",
   parts: [{ name: "", quantity: "1" }] as PartItem[],
   photos: [] as PhotoItem[],
   additionalNotes: "",
@@ -158,7 +158,7 @@ const createInitialFormData = () => ({
   customerTitle: "",
   techSignature: "",
   techSignatureLocked: false,
-  customerSignature: "",
+  customer_signature: "",
   customerSignatureLocked: false,
 });
 
@@ -200,18 +200,18 @@ export default function Home() {
 
   const [formData, setFormData] = useState(createInitialFormData);
 
-  const arrivalDate = formData.arrivalDateTime.split("T")[0] ?? "";
-  const arrivalTime = formData.arrivalDateTime.split("T")[1] ?? "";
+  const arrivalDate = formData.arrival_date_time.split("T")[0] ?? "";
+  const arrivalTime = formData.arrival_date_time.split("T")[1] ?? "";
   const completionDate = formData.completionDate;
   const completionTime = formData.completionTime;
 
   const selectedChecklist =
-    dynamicChecklist && dynamicChecklistType === formData.equipmentType
+    dynamicChecklist && dynamicChecklistType === formData.equipment_type
       ? dynamicChecklist
-      : checklistByType[formData.equipmentType] ?? checklistByType.default;
+      : checklistByType[formData.equipment_type] ?? checklistByType.default;
 
   useEffect(() => {
-    if (!formData.equipmentType) {
+    if (!formData.equipment_type) {
       setDynamicChecklist(null);
       setDynamicChecklistType("");
       setDynamicChecklistName(null);
@@ -222,12 +222,12 @@ export default function Home() {
     setDynamicChecklist(null);
     setDynamicChecklistType("");
     setDynamicChecklistName(null);
-    let isActive = true;
+    let is_active = true;
 
     const loadChecklistTemplate = async () => {
       setIsChecklistLoading(true);
       try {
-        const query = new URLSearchParams({ equipmentType: formData.equipmentType });
+        const query = new URLSearchParams({ equipment_type: formData.equipment_type });
         const response = await fetch(`${API_BASE_URL}/checklists/template?${query.toString()}`, {
           cache: "no-store",
         });
@@ -235,7 +235,7 @@ export default function Home() {
           | { data?: { name?: string | null; categories?: ChecklistGroup[] | null } | null }
           | null;
 
-        if (!isActive) {
+        if (!is_active) {
           return;
         }
 
@@ -243,16 +243,16 @@ export default function Home() {
         const categories = template?.categories;
         const hasCategories = Array.isArray(categories) && categories.length > 0;
         setDynamicChecklist(hasCategories ? categories : null);
-        setDynamicChecklistType(hasCategories ? formData.equipmentType : "");
+        setDynamicChecklistType(hasCategories ? formData.equipment_type : "");
         setDynamicChecklistName(hasCategories ? (template?.name ?? null) : null);
       } catch {
-        if (isActive) {
+        if (is_active) {
           setDynamicChecklist(null);
           setDynamicChecklistType("");
           setDynamicChecklistName(null);
         }
       } finally {
-        if (isActive) {
+        if (is_active) {
           setIsChecklistLoading(false);
         }
       }
@@ -261,9 +261,9 @@ export default function Home() {
     void loadChecklistTemplate();
 
     return () => {
-      isActive = false;
+      is_active = false;
     };
-  }, [formData.equipmentType]);
+  }, [formData.equipment_type]);
 
   useEffect(() => {
     setFormData((prev) => {
@@ -282,7 +282,7 @@ export default function Home() {
       return { ...prev, checklistState: nextChecklist };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.equipmentType, dynamicChecklist]);
+  }, [formData.equipment_type, dynamicChecklist]);
 
   useEffect(() => {
     const initLookups = async () => {
@@ -295,7 +295,7 @@ export default function Home() {
         const typesPayload = await typesRes.json();
         setBuildings(buildingsPayload.data ?? []);
         setEquipmentTypes(
-          (typesPayload.data ?? []).map((item: { equipmentType: string }) => item.equipmentType),
+          (typesPayload.data ?? []).map((item: { equipment_type: string }) => item.equipment_type),
         );
       } catch {
         setSubmitMessage("Cannot load lookup data. Please ensure backend is running.");
@@ -307,14 +307,14 @@ export default function Home() {
 
   useEffect(() => {
     const fetchEquipment = async () => {
-      if (!formData.buildingId) {
+      if (!formData.building_id) {
         setEquipmentList([]);
         return;
       }
 
-      const query = new URLSearchParams({ buildingId: formData.buildingId });
-      if (formData.equipmentType) {
-        query.set("equipmentType", formData.equipmentType);
+      const query = new URLSearchParams({ building_id: formData.building_id });
+      if (formData.equipment_type) {
+        query.set("equipment_type", formData.equipment_type);
       }
 
       const res = await fetch(`${API_BASE_URL}/equipment/by-building?${query.toString()}`);
@@ -323,7 +323,7 @@ export default function Home() {
     };
 
     void fetchEquipment();
-  }, [formData.buildingId, formData.equipmentType]);
+  }, [formData.building_id, formData.equipment_type]);
 
   const checkedCount = useMemo(
     () => Object.values(formData.checklistState).filter((v) => v.length > 0).length,
@@ -343,8 +343,8 @@ export default function Home() {
     const errors: Record<string, string> = {};
 
     if (currentStep === 1) {
-      if (!formData.buildingId) errors.buildingId = "Building is required";
-      if (!formData.equipmentType) errors.equipmentType = "Equipment type is required";
+      if (!formData.building_id) errors.building_id = "Building is required";
+      if (!formData.equipment_type) errors.equipment_type = "Equipment type is required";
       if (!formData.equipmentId) errors.equipmentId = "Equipment ID is required";
       if (!arrivalDate) errors.arrivalDate = "Arrival date is required";
       if (!arrivalTime) errors.arrivalTime = "Arrival time is required";
@@ -359,7 +359,7 @@ export default function Home() {
       if (!formData.completionTime) errors.completionTime = "Completion time is required";
       if (!formData.customerName) errors.customerName = "Customer name is required";
       if (!formData.techSignature) errors.techSignature = "Technician signature is required";
-      if (!formData.customerSignature) errors.customerSignature = "Customer signature is required";
+      if (!formData.customer_signature) errors.customer_signature = "Customer signature is required";
     }
 
     return errors;
@@ -374,26 +374,26 @@ export default function Home() {
   }, [
     step,
     checkedCount,
-    formData.buildingId,
-    formData.equipmentType,
+    formData.building_id,
+    formData.equipment_type,
     formData.equipmentId,
-    formData.arrivalDateTime,
+    formData.arrival_date_time,
     formData.completionDate,
     formData.completionTime,
     formData.customerName,
     formData.techSignature,
-    formData.customerSignature,
+    formData.customer_signature,
   ]);
 
   const updateArrival = (date: string, time: string) => {
     if (!date && !time) {
-      updateField("arrivalDateTime", "");
+      updateField("arrival_date_time", "");
       return;
     }
     const now = getLocalDateTimeParts();
     const normalizedDate = date || now.date;
     const normalizedTime = time || "00:00";
-    updateField("arrivalDateTime", `${normalizedDate}T${normalizedTime}`);
+    updateField("arrival_date_time", `${normalizedDate}T${normalizedTime}`);
   };
 
   const updateCompletion = (date: string, time: string) => {
@@ -569,7 +569,7 @@ export default function Home() {
     return { canvas, context };
   };
 
-  const initCustomerCanvas = (signatureDataUrl = formData.customerSignature) => {
+  const initCustomerCanvas = (signatureDataUrl = formData.customer_signature) => {
     const drawing = getCustomerCanvasContext();
     if (!drawing) {
       return;
@@ -589,7 +589,7 @@ export default function Home() {
 
     return () => window.cancelAnimationFrame(frameId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, formData.techSignature, formData.customerSignature]);
+  }, [step, formData.techSignature, formData.customer_signature]);
 
   const getCanvasPoint = (
     event: PointerEvent<HTMLCanvasElement>,
@@ -714,23 +714,23 @@ export default function Home() {
     if (!drawing) {
       return;
     }
-    updateField("customerSignature", drawing.canvas.toDataURL("image/png"));
+    updateField("customer_signature", drawing.canvas.toDataURL("image/png"));
   };
 
   const clearCustomerSignature = () => {
     setFormData((prev) => ({
       ...prev,
-      customerSignature: "",
+      customer_signature: "",
       customerSignatureLocked: false,
     }));
     initCustomerCanvas("");
   };
 
   const markCustomerSignature = () => {
-    if (!formData.customerSignature) {
+    if (!formData.customer_signature) {
       setStepErrors((prev) => ({
         ...prev,
-        customerSignature: "Customer signature is required",
+        customer_signature: "Customer signature is required",
       }));
       setSubmitMessage("Please draw customer signature before marking as signed.");
       return;
@@ -782,10 +782,10 @@ export default function Home() {
         formData.customerMessage ? `Customer message: ${formData.customerMessage}` : "",
       ].filter(Boolean);
 
-      const checklistResults = {
-        equipmentType: formData.equipmentType,
+      const checklist_results = {
+        equipment_type: formData.equipment_type,
         templateName:
-          dynamicChecklist && dynamicChecklistType === formData.equipmentType
+          dynamicChecklist && dynamicChecklistType === formData.equipment_type
             ? dynamicChecklistName
             : null,
         checkedCount,
@@ -801,21 +801,22 @@ export default function Home() {
       };
 
       const payload = {
-        buildingId: formData.buildingId,
+        building_id: formData.building_id,
         equipmentId: formData.equipmentId,
-        maintenanceType: formData.maintenanceType,
-        arrivalDateTime: new Date(formData.arrivalDateTime).toISOString(),
-        technicianName: formData.technicianName,
-        checklistResults,
+        maintenance_type: formData.maintenance_type,
+        arrival_date_time: new Date(formData.arrival_date_time).toISOString(),
+        technician_name: formData.technician_name,
+        checklist_results,
         findings: `${checkedCount}/${totalCount} checklist items assessed`,
-        workPerformed: formData.partsReplaced === "yes" ? "Parts replaced" : "Routine service",
-        partsUsed:
-          formData.partsReplaced === "yes"
+        work_performed: formData.partsReplaced === "replaced" ? "Parts replaced" : formData.partsReplaced === "needs-replacement" ? "Parts need replacement" : "Routine service",
+        parts_used:
+          formData.partsReplaced !== "no-change"
             ? formData.parts
                 .filter((part) => part.name.trim())
                 .map((part) => ({
                   name: part.name,
                   quantity: Number(part.quantity || "1"),
+                  status: formData.partsReplaced as "replaced" | "needs-replacement",
                 }))
             : [],
         remarks: remarksParts.join(" | "),
@@ -825,8 +826,8 @@ export default function Home() {
           size: photo.size,
           dataUrl: photo.dataUrl,
         })),
-        technicianSignature: formData.techSignature,
-        customerSignature: formData.customerSignature,
+        technician_signature: formData.techSignature,
+        customer_signature: formData.customer_signature,
       };
 
       const res = await fetch(`${API_BASE_URL}/maintenance-reports`, {
@@ -840,7 +841,7 @@ export default function Home() {
         throw new Error(result.message ?? "Submit failed");
       }
 
-      setSuccessReportCode(result.data.reportCode ?? null);
+      setSuccessReportCode(result.data.report_code ?? null);
       setSuccessStatus(result.data.status ?? null);
       setShowSuccessModal(true);
     } catch (error) {
@@ -948,17 +949,17 @@ export default function Home() {
                   </label>
                   <select
                     className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                      stepErrors.buildingId ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                      stepErrors.building_id ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
                     }`}
-                    value={formData.buildingId}
-                    onChange={(event) => updateField("buildingId", event.target.value)}
+                    value={formData.building_id}
+                    onChange={(event) => updateField("building_id", event.target.value)}
                   >
                     <option value="">Select building...</option>
                     {buildings.map((building) => (
                       <option key={building.id} value={building.id}>{building.name}</option>
                     ))}
                   </select>
-                  {stepErrors.buildingId && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.buildingId}</p>}
+                  {stepErrors.building_id && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.building_id}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -969,15 +970,15 @@ export default function Home() {
                     </label>
                     <select
                       className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                        stepErrors.equipmentType ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
+                        stepErrors.equipment_type ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
                       }`}
-                      value={formData.equipmentType}
-                      onChange={(event) => { updateField("equipmentType", event.target.value); updateField("equipmentId", ""); }}
+                      value={formData.equipment_type}
+                      onChange={(event) => { updateField("equipment_type", event.target.value); updateField("equipmentId", ""); }}
                     >
                       <option value="">Select type...</option>
                       {equipmentTypes.map((et) => <option key={et} value={et}>{et}</option>)}
                     </select>
-                    {stepErrors.equipmentType && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentType}</p>}
+                    {stepErrors.equipment_type && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipment_type}</p>}
                   </div>
                   <div>
                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
@@ -989,11 +990,11 @@ export default function Home() {
                         stepErrors.equipmentId ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
                       }`}
                       value={formData.equipmentId}
-                      disabled={!formData.equipmentType}
+                      disabled={!formData.equipment_type}
                       onChange={(event) => updateField("equipmentId", event.target.value)}
                     >
-                      <option value="">{formData.equipmentType ? "Select..." : "Select type first"}</option>
-                      {equipmentList.map((eq) => <option key={eq.id} value={eq.id}>{eq.equipmentCode}</option>)}
+                      <option value="">{formData.equipment_type ? "Select..." : "Select type first"}</option>
+                      {equipmentList.map((eq) => <option key={eq.id} value={eq.id}>{eq.equipment_code}</option>)}
                     </select>
                     {stepErrors.equipmentId && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentId}</p>}
                   </div>
@@ -1048,7 +1049,7 @@ export default function Home() {
                   </label>
                   <input
                     className="h-12 w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 text-base text-slate-500 cursor-not-allowed"
-                    value={formData.technicianName}
+                    value={formData.technician_name}
                     readOnly
                   />
                 </div>
@@ -1058,19 +1059,19 @@ export default function Home() {
 
           {step === 2 && (
             <div className="space-y-6">
-              {!formData.equipmentType && (
+              {!formData.equipment_type && (
                 <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-700">
                   Please select equipment type in Basic Information.
                 </div>
               )}
 
-              {formData.equipmentType && isChecklistLoading && (
+              {formData.equipment_type && isChecklistLoading && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                  Loading the latest checklist template for {formData.equipmentType}...
+                  Loading the latest checklist template for {formData.equipment_type}...
                 </div>
               )}
 
-              {formData.equipmentType && dynamicChecklist && !isChecklistLoading && (
+              {formData.equipment_type && dynamicChecklist && !isChecklistLoading && (
                 <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
                   Using the checklist template configured in the admin portal for this equipment type.
                 </div>
@@ -1190,7 +1191,7 @@ export default function Home() {
                   value={formData.additionalNotes}
                   onChange={(v) => updateField("additionalNotes", v)}
                   field="notes"
-                  equipmentType={formData.equipmentType}
+                  equipment_type={formData.equipment_type}
                   minHeight="120px"
                 />
               </div>
@@ -1205,7 +1206,7 @@ export default function Home() {
                   value={formData.customerMessage}
                   onChange={(v) => updateField("customerMessage", v)}
                   field="remarks"
-                  equipmentType={formData.equipmentType}
+                  equipment_type={formData.equipment_type}
                   minHeight="90px"
                 />
               </div>
@@ -1224,7 +1225,7 @@ export default function Home() {
                   value={formData.issuesFound}
                   onChange={(v) => updateField("issuesFound", v)}
                   field="findings"
-                  equipmentType={formData.equipmentType}
+                  equipment_type={formData.equipment_type}
                   minHeight="120px"
                 />
               </div>
@@ -1234,34 +1235,43 @@ export default function Home() {
                   Did you replace any parts?
                 </label>
                 <div className="space-y-3">
-                  {["no", "yes"].map((choice) => (
+                  {([
+                    { value: "no-change", label: "No Change", color: "border-slate-400 bg-slate-50" },
+                    { value: "replaced", label: "Yes (Replaced)", color: "border-[#f59e0b] bg-[hsl(35,80%,95%)]" },
+                    { value: "needs-replacement", label: "Needs Replacement", color: "border-amber-500 bg-amber-50" },
+                  ] as const).map((choice) => (
                     <button
-                      key={choice}
+                      key={choice.value}
                       type="button"
-                      onClick={() => updateField("partsReplaced", choice)}
-                      className={`flex w-full items-center rounded-lg border-2 p-4 text-left capitalize ${
-                        formData.partsReplaced === choice
-                          ? "border-[#f59e0b] bg-[hsl(35,80%,95%)]"
+                      onClick={() => updateField("partsReplaced", choice.value)}
+                      className={`flex w-full items-center rounded-lg border-2 p-4 text-left ${
+                        formData.partsReplaced === choice.value
+                          ? choice.color
                           : "border-slate-300 bg-white"
                       }`}
                     >
-                      <span className="text-[15px] font-medium">{choice}</span>
+                      <span className="text-[15px] font-medium">{choice.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {formData.partsReplaced === "yes" && (
+              {formData.partsReplaced !== "no-change" && (
                 <div className="space-y-3 rounded-lg border-2 border-slate-300 bg-slate-50 p-3">
                   <p className="text-sm font-semibold text-slate-700">Parts</p>
                   {formData.parts.map((part, index) => (
                     <div key={`part-${index}`} className="grid grid-cols-5 gap-2">
-                      <input
-                        className="form-input col-span-3 h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
-                        placeholder="Part name"
-                        value={part.name}
-                        onChange={(event) => updatePart(index, "name", event.target.value)}
-                      />
+                      <div className="col-span-3">
+                        <SmartTextInput
+                          className="form-input w-full h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
+                          placeholder="Part name"
+                          value={part.name}
+                          onChange={(v) => updatePart(index, "name", v)}
+                          field="parts"
+                          multiline={false}
+                          minHeight="44px"
+                        />
+                      </div>
                       <input
                         className="form-input col-span-1 h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
                         type="number"
@@ -1299,8 +1309,8 @@ export default function Home() {
                   Basic Information
                 </h3>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div><span className="text-slate-400 text-xs block">Building</span><span className="font-medium text-slate-800">{buildings.find((item) => item.id === formData.buildingId)?.name || "-"}</span></div>
-                  <div><span className="text-slate-400 text-xs block">Equipment</span><span className="font-medium text-slate-800">{equipmentList.find((item) => item.id === formData.equipmentId)?.equipmentCode || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Building</span><span className="font-medium text-slate-800">{buildings.find((item) => item.id === formData.building_id)?.name || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Equipment</span><span className="font-medium text-slate-800">{equipmentList.find((item) => item.id === formData.equipmentId)?.equipment_code || "-"}</span></div>
                   <div><span className="text-slate-400 text-xs block">Service Date</span><span className="font-medium text-slate-800">{arrivalDate || "-"}</span></div>
                   <div><span className="text-slate-400 text-xs block">Arrival Time</span><span className="font-medium text-slate-800">{arrivalTime || "-"}</span></div>
                 </dl>
@@ -1313,7 +1323,7 @@ export default function Home() {
                 </h3>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div><span className="text-slate-400 text-xs block">Checklist</span><span className="font-medium text-slate-800">{checkedCount}/{totalCount} assessed</span></div>
-                  <div><span className="text-slate-400 text-xs block">Parts Replaced</span><span className="font-medium text-slate-800 capitalize">{formData.partsReplaced}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Parts</span><span className="font-medium text-slate-800">{formData.partsReplaced === "no-change" ? "No Change" : formData.partsReplaced === "replaced" ? "Yes (Replaced)" : "Needs Replacement"}</span></div>
                   <div><span className="text-slate-400 text-xs block">Photos</span><span className="font-medium text-slate-800">{formData.photos.length} uploaded</span></div>
                   <div><span className="text-slate-400 text-xs block">Issues</span><span className="font-medium text-slate-800 line-clamp-1">{formData.issuesFound || "None reported"}</span></div>
                 </div>
@@ -1480,16 +1490,16 @@ export default function Home() {
 
               <div
                 className={`rounded-lg border-2 bg-slate-50 p-3 ${
-                  stepErrors.customerSignature ? "border-red-500" : "border-slate-300"
+                  stepErrors.customer_signature ? "border-red-500" : "border-slate-300"
                 }`}
               >
                 <p className="mb-2 text-[15px] font-semibold text-slate-900">Customer Signature *</p>
-                {stepErrors.customerSignature && (
-                  <p className="mb-2 text-xs font-medium text-red-600">{stepErrors.customerSignature}</p>
+                {stepErrors.customer_signature && (
+                  <p className="mb-2 text-xs font-medium text-red-600">{stepErrors.customer_signature}</p>
                 )}
                 <div
                   className={`relative rounded-lg border-2 border-dashed p-2 transition-all ${
-                    stepErrors.customerSignature ? "border-red-400 bg-red-50" : "border-slate-300 bg-white"
+                    stepErrors.customer_signature ? "border-red-400 bg-red-50" : "border-slate-300 bg-white"
                   } ${formData.customerSignatureLocked ? "ring-2 ring-emerald-200 shadow-inner" : ""}`}
                 >
                   <canvas
@@ -1497,7 +1507,7 @@ export default function Home() {
                     width={560}
                     height={180}
                     className={`h-36 w-full touch-none rounded-md ${
-                      stepErrors.customerSignature ? "bg-red-50" : "bg-white"
+                      stepErrors.customer_signature ? "bg-red-50" : "bg-white"
                     } ${formData.customerSignatureLocked ? "pointer-events-none cursor-not-allowed opacity-70" : ""}`}
                     onPointerDown={startCustomerDrawing}
                     onPointerMove={moveCustomerDrawing}
@@ -1514,7 +1524,7 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-                  {!formData.customerSignature && !formData.customerSignatureLocked && (
+                  {!formData.customer_signature && !formData.customerSignatureLocked && (
                     <p className="mt-2 text-center text-xs text-slate-500">
                       Sign here: press and drag to draw your signature
                     </p>
@@ -1530,7 +1540,7 @@ export default function Home() {
                     type="button"
                     className="h-10 rounded-lg bg-[#1b3c7b] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
                     onClick={markCustomerSignature}
-                    disabled={formData.customerSignatureLocked || !formData.customerSignature}
+                    disabled={formData.customerSignatureLocked || !formData.customer_signature}
                   >
                     {formData.customerSignatureLocked ? "Signed" : "Mark as Signed"}
                   </button>
