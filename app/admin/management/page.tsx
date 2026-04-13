@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAdminSession } from "../../../lib/admin-session-context";
+import { useEffect, useState, useRef } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
@@ -13,6 +12,18 @@ interface ScheduleRow {
   frequency: string;
   technician_name: string;
   status: string;
+}
+
+interface ScheduleResponse {
+  data: ScheduleRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  filters: {
+    equipmentTypes: string[];
+    statuses: string[];
+  };
 }
 
 type SortField = keyof ScheduleRow;
@@ -49,38 +60,20 @@ const COLUMNS: { key: SortField; label: string }[] = [
   { key: "status", label: "Status" },
 ];
 
-function parseDate(d: string): number {
-  const t = Date.parse(d);
-  return isNaN(t) ? 0 : t;
-}
-
-function parseFrequency(f: string): number {
-  // Dash → sort to bottom (largest value)
-  if (!f || f === "—") return Number.MAX_SAFE_INTEGER;
-  const m = f.match(/^(\d+)\s*(Day|Week|Month|Year)s?/i);
-  if (!m) return 0;
-  const n = parseInt(m[1]);
-  const unit = m[2].toLowerCase();
-  // Normalize to days for comparison
-  if (unit === "year") return n * 365;
-  if (unit === "month") return n * 30;
-  if (unit === "week") return n * 7;
-  return n; // day
-}
-
 export default function ManagementPage() {
-  const { session } = useAdminSession();
-  const [data, setData] = useState<ScheduleRow[]>([]);
+  const [rows, setRows] = useState<ScheduleRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [equipmentTypes, setEquipmentTypes] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterEquipment, setFilterEquipment] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-
-  // Sort
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -88,54 +81,44 @@ export default function ManagementPage() {
     ? document.cookie.split("; ").find(c => c.startsWith("yecl-admin-session="))?.split("=")[1] ?? ""
     : "";
 
+  // Debounce search input
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Fetch data whenever any query param changes
+  const reqIdRef = useRef(0);
+  useEffect(() => {
+    const reqId = ++reqIdRef.current;
     setLoading(true);
-    fetch(`${API_BASE}/maintenance-reports/admin/management-schedule`, {
+    const params = new URLSearchParams();
+    params.set("page", String(currentPage));
+    params.set("pageSize", String(pageSize));
+    params.set("sortField", sortField);
+    params.set("sortDir", sortDir);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (filterEquipment) params.set("equipmentType", filterEquipment);
+    if (filterStatus) params.set("status", filterStatus);
+
+    fetch(`${API_BASE}/maintenance-reports/admin/management-schedule?${params}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(r => r.json())
-      .then(d => { setData(Array.isArray(d) ? d : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [token]);
+      .then((d: ScheduleResponse) => {
+        if (reqId !== reqIdRef.current) return; // Ignore stale responses
+        setRows(d.data ?? []);
+        setTotal(d.total ?? 0);
+        setTotalPages(d.totalPages ?? 1);
+        setEquipmentTypes(d.filters?.equipmentTypes ?? []);
+        setStatuses(d.filters?.statuses ?? []);
+        setLoading(false);
+      })
+      .catch(() => { if (reqId === reqIdRef.current) setLoading(false); });
+  }, [token, currentPage, pageSize, sortField, sortDir, debouncedSearch, filterEquipment, filterStatus]);
 
-  // Unique values for filters
-  const equipmentTypes = [...new Set(data.map(r => r.equipment_type))].sort();
-  const statuses = [...new Set(data.map(r => r.status))].sort();
-
-  // Filtered
-  const filtered = data.filter(r => {
-    if (filterEquipment && r.equipment_type !== filterEquipment) return false;
-    if (filterStatus && r.status !== filterStatus) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return r.equipment_type.toLowerCase().includes(q)
-        || r.equipment_code.toLowerCase().includes(q)
-        || r.technician_name.toLowerCase().includes(q)
-        || r.maintenance_type.toLowerCase().includes(q);
-    }
-    return true;
-  });
-
-  // Sorted
-  const sorted = [...filtered].sort((a, b) => {
-    let cmp = 0;
-    if (sortField === "date") {
-      cmp = parseDate(a.date) - parseDate(b.date);
-    } else if (sortField === "frequency") {
-      cmp = parseFrequency(a.frequency) - parseFrequency(b.frequency);
-    } else {
-      cmp = (a[sortField] ?? "").localeCompare(b[sortField] ?? "");
-    }
-    return sortDir === "asc" ? cmp : -cmp;
-  });
-
-  // Paginated
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginated = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
-
-  // Reset page on filter/search change
-  useEffect(() => { setCurrentPage(1); }, [search, filterEquipment, filterStatus, pageSize]);
+  // Reset page when filters/search change
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, filterEquipment, filterStatus, pageSize]);
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -151,7 +134,6 @@ export default function ManagementPage() {
 
   return (
     <div>
-      {/* Page header */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-800">Maintenance Schedule</h1>
         <p className="text-sm text-gray-500 mt-0.5">Overview of all maintenance activities and service frequency</p>
@@ -177,7 +159,7 @@ export default function ManagementPage() {
             <option value="">All Status</option>
             {statuses.map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
           </select>
-          <span className="text-xs text-gray-400 font-medium">{filtered.length} records</span>
+          <span className="text-xs text-gray-400 font-medium">{total} records</span>
         </div>
       </div>
 
@@ -210,7 +192,7 @@ export default function ManagementPage() {
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
+                Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
                     {Array.from({ length: 7 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
@@ -219,12 +201,12 @@ export default function ManagementPage() {
                     ))}
                   </tr>
                 ))
-              ) : paginated.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">No records found</td>
                 </tr>
               ) : (
-                paginated.map((row, i) => {
+                rows.map((row, i) => {
                   const sc = STATUS_COLORS[row.status.toLowerCase()] ?? { bg: "#f3f4f6", text: "#374151" };
                   return (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors" style={i % 2 === 0 ? { backgroundColor: "#f0f9ff08" } : {}}>
@@ -252,11 +234,11 @@ export default function ManagementPage() {
         </div>
 
         {/* Pagination */}
-        {!loading && sorted.length > 0 && (
+        {!loading && total > 0 && (
           <div className="flex flex-wrap items-center justify-between px-4 py-3 border-t border-gray-100 gap-3">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500">
-                Showing {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, sorted.length)} of {sorted.length}
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} of {total}
               </span>
               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <span>Show</span>
@@ -270,12 +252,12 @@ export default function ManagementPage() {
             </div>
             {totalPages > 1 && (
               <div className="flex items-center gap-1">
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
                   className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                   Prev
                 </button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
                   .reduce<(number | "ellipsis")[]>((acc, p, idx, arr) => {
                     if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("ellipsis");
                     acc.push(p);
@@ -286,12 +268,12 @@ export default function ManagementPage() {
                       <span key={`e${idx}`} className="px-1.5 text-gray-400 text-xs">...</span>
                     ) : (
                       <button key={item} onClick={() => setCurrentPage(item as number)}
-                        className={`min-w-[32px] py-1.5 rounded border text-xs transition-all ${safePage === item ? "bg-green-700 text-white border-green-700 font-bold" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
+                        className={`min-w-[32px] py-1.5 rounded border text-xs transition-all ${currentPage === item ? "bg-green-700 text-white border-green-700 font-bold" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
                         {item}
                       </button>
                     )
                   )}
-                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
                   className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                   Next
                 </button>
