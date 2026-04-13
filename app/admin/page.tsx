@@ -65,7 +65,7 @@ interface WorkOrderDetail extends WorkOrder {
     categories: Array<{ category: string; items: Array<{ label: string; checked: boolean; status?: string }> }> } | null;
   remarks: string | null;
   internal_notes: Array<{ id: string; at: string; author: string; kind: string; text: string }> | null;
-  photos: Array<{ name: string; mimeType: string; size: number; dataUrl: string }> | null;
+  photos: Array<{ name: string; mimeType: string; size: number; url?: string; dataUrl?: string }> | null;
   technician_signature: string | null;
   customer_signature: string | null;
   assigned_to: string | null; updated_at: string;
@@ -978,7 +978,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
   const [tab, setTab] = useState<"info" | "notes" | "mmpr">("info");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [lightbox, setLightbox] = useState<{ index: number; photos: Array<{ dataUrl: string; name: string }> } | null>(null);
+  const [lightbox, setLightbox] = useState<{ index: number; photos: Array<{ url?: string; dataUrl?: string; name: string }> } | null>(null);
   const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   const [editEquipmentId, setEditEquipmentId] = useState("");
 
@@ -1332,7 +1332,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
                     {detail.photos.map((photo, i) => (
                       <button key={i} onClick={() => setLightbox({ index: i, photos: detail.photos! })} className="group flex-shrink-0 w-36 rounded-lg overflow-hidden border border-gray-200 hover:border-green-400 transition-all hover:shadow-md text-left cursor-zoom-in" style={{ scrollSnapAlign: "start" }}>
-                        <img src={photo.dataUrl} alt={photo.name} className="w-full h-28 object-cover bg-gray-50 group-hover:scale-105 transition-transform duration-200" />
+                        <img src={photo.url ?? photo.dataUrl} alt={photo.name} className="w-full h-28 object-cover bg-gray-50 group-hover:scale-105 transition-transform duration-200" />
                         <div className="px-2 py-1.5 bg-white">
                           <p className="text-[11px] text-gray-600 truncate">{photo.name}</p>
                           <p className="text-[10px] text-gray-400">{(photo.size / 1024).toFixed(0)} KB</p>
@@ -1360,7 +1360,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                       </button>
                     </>
                   )}
-                  <img src={lightbox.photos[lightbox.index].dataUrl} alt={lightbox.photos[lightbox.index].name} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" style={{ animation: "slideUp .2s ease" }} onClick={e => e.stopPropagation()} />
+                  <img src={lightbox.photos[lightbox.index].url ?? lightbox.photos[lightbox.index].dataUrl} alt={lightbox.photos[lightbox.index].name} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" style={{ animation: "slideUp .2s ease" }} onClick={e => e.stopPropagation()} />
                 </div>
               )}
               {(detail.technician_signature || detail.customer_signature) && (
