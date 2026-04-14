@@ -19,7 +19,7 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/admin-auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
@@ -30,10 +30,11 @@ export default function AdminLoginPage() {
         throw new Error(body.message ?? "Invalid email or password");
       }
 
-      const { token } = await res.json();
+      const { accessToken, refreshToken } = await res.json();
 
-      // Store token in cookie
-      document.cookie = `${ADMIN_SESSION_COOKIE}=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
+      // Store access token in session cookie (1h) + refresh token (30d)
+      document.cookie = `${ADMIN_SESSION_COOKIE}=${accessToken}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+      document.cookie = `yecl-admin-refresh=${refreshToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
 
       router.push("/admin");
     } catch (err: any) {

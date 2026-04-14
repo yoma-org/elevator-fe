@@ -26,6 +26,12 @@ const NAV_ITEMS = [
         desc: "Maintenance schedule",
         icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M2 7h16M6 3v4M14 3v4M6 11h2M6 14h2M10 11h2M10 14h2M14 11h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
       },
+      {
+        label: "Roster Upload",
+        href: "/admin/roster",
+        desc: "Upload & preview Excel",
+        icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6l-4-4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 2v4h4M10 13v-3M7 13v-5M13 13v-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+      },
     ],
   },
 ];
