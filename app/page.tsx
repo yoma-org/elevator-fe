@@ -294,19 +294,15 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.equipment_type, dynamicChecklist]);
 
+  // All equipment in the selected building (used to derive types + filter codes)
+  const [allBuildingEquipment, setAllBuildingEquipment] = useState<Equipment[]>([]);
+
   useEffect(() => {
     const initLookups = async () => {
       try {
-        const [buildingsRes, typesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/equipment/buildings`),
-          fetch(`${API_BASE_URL}/equipment/types`),
-        ]);
+        const buildingsRes = await fetch(`${API_BASE_URL}/equipment/buildings`);
         const buildingsPayload = await buildingsRes.json();
-        const typesPayload = await typesRes.json();
         setBuildings(buildingsPayload.data ?? []);
-        setEquipmentTypes(
-          (typesPayload.data ?? []).map((item: { equipment_type: string }) => item.equipment_type),
-        );
       } catch {
         setSubmitMessage("Cannot load lookup data. Please ensure backend is running.");
       }
@@ -315,25 +311,37 @@ export default function Home() {
     void initLookups();
   }, []);
 
+  // When building changes: reset type + fetch all equipment for this building
   useEffect(() => {
-    const fetchEquipment = async () => {
+    const fetchBuildingEquipment = async () => {
       if (!formData.building_id) {
-        setEquipmentList([]);
+        setAllBuildingEquipment([]);
+        setEquipmentTypes([]);
         return;
       }
 
       const query = new URLSearchParams({ building_id: formData.building_id });
-      if (formData.equipment_type) {
-        query.set("equipment_type", formData.equipment_type);
-      }
-
       const res = await fetch(`${API_BASE_URL}/equipment/by-building?${query.toString()}`);
       const payload = await res.json();
-      setEquipmentList(payload.data ?? []);
+      const list: Equipment[] = payload.data ?? [];
+      setAllBuildingEquipment(list);
+
+      // Derive unique equipment_types present in this building
+      const uniqueTypes = [...new Set(list.map((e) => e.equipment_type).filter(Boolean))].sort();
+      setEquipmentTypes(uniqueTypes);
     };
 
-    void fetchEquipment();
-  }, [formData.building_id, formData.equipment_type]);
+    void fetchBuildingEquipment();
+  }, [formData.building_id]);
+
+  // When equipment_type changes: filter equipment list from building's equipment
+  useEffect(() => {
+    if (!formData.equipment_type) {
+      setEquipmentList([]);
+      return;
+    }
+    setEquipmentList(allBuildingEquipment.filter((e) => e.equipment_type === formData.equipment_type));
+  }, [formData.equipment_type, allBuildingEquipment]);
 
   const checkedCount = useMemo(
     () => Object.values(formData.checklistState).filter((v) => v.length > 0).length,
@@ -961,7 +969,11 @@ export default function Home() {
                   <Combobox
                     options={buildings.map((b) => ({ value: b.id, label: b.name }))}
                     value={formData.building_id}
-                    onChange={(v) => updateField("building_id", v)}
+                    onChange={(v) => {
+                      updateField("building_id", v);
+                      updateField("equipment_type", "");
+                      updateField("equipmentId", "");
+                    }}
                     placeholder="Select building..."
                     error={Boolean(stepErrors.building_id)}
                   />
@@ -973,13 +985,15 @@ export default function Home() {
                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><rect x="3" y="2" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5h3M5.5 7.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                       Equipment Type <span className="text-red-500">*</span>
-                      <span className="ml-auto text-[10px] font-normal text-slate-400">{equipmentTypes.length} types</span>
+                      {formData.building_id && <span className="ml-auto text-[10px] font-normal text-slate-400">{equipmentTypes.length} in this building</span>}
                     </label>
                     <Combobox
                       options={equipmentTypes.map((et) => ({ value: et, label: et }))}
                       value={formData.equipment_type}
                       onChange={(v) => { updateField("equipment_type", v); updateField("equipmentId", ""); }}
                       placeholder="Select type..."
+                      disabled={!formData.building_id}
+                      disabledMessage="Select building first"
                       error={Boolean(stepErrors.equipment_type)}
                     />
                     {stepErrors.equipment_type && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipment_type}</p>}
