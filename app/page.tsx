@@ -240,9 +240,18 @@ export default function Home() {
         }
 
         const template = payload?.data;
-        const categories = template?.categories;
-        const hasCategories = Array.isArray(categories) && categories.length > 0;
-        setDynamicChecklist(hasCategories ? categories : null);
+        const rawCategories = template?.categories;
+        const hasCategories = Array.isArray(rawCategories) && rawCategories.length > 0;
+        // Normalize: items may be string[] OR { no, label }[] — flatten to string[]
+        const categories = hasCategories
+          ? rawCategories!.map((g: any) => ({
+              category: g.category,
+              items: (g.items ?? []).map((i: any) =>
+                typeof i === 'string' ? i : (i?.label ?? i?.no ?? ''),
+              ),
+            }))
+          : null;
+        setDynamicChecklist(categories);
         setDynamicChecklistType(hasCategories ? formData.equipment_type : "");
         setDynamicChecklistName(hasCategories ? (template?.name ?? null) : null);
       } catch {
