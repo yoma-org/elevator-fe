@@ -374,70 +374,105 @@ export default function RosterUploadPage() {
     if (!confirm("This will insert new records into the database. Proceed?")) return;
 
     const payload = buildImportPayload();
-    const totalRecords = payload.buildings.length + payload.equipmentTypes.length + payload.equipment.length;
-
-    // Estimated duration (ms) — ~50ms per record on average
-    const estimatedDuration = Math.max(3000, totalRecords * 50);
-
-    // Simulated progress stages (visual only — backend is a single atomic call)
-    const stages = [
-      { pct: 10, label: "Preparing data...", step: 0 },
-      { pct: 25, label: `Creating import batch...`, step: 1 },
-      { pct: 40, label: `Importing ${payload.equipmentTypes.length} equipment types...`, step: 2 },
-      { pct: 65, label: `Importing ${payload.buildings.length} buildings...`, step: 3 },
-      { pct: 90, label: `Importing ${payload.equipment.length} equipment records...`, step: 4 },
-      { pct: 95, label: "Finalizing...", step: 5 },
-    ];
+    const CHUNK_SIZE = 50;
+    const equipmentChunks: typeof payload.equipment[] = [];
+    for (let i = 0; i < payload.equipment.length; i += CHUNK_SIZE) {
+      equipmentChunks.push(payload.equipment.slice(i, i + CHUNK_SIZE));
+    }
+    const totalSteps = 2 + equipmentChunks.length + 1; // start + N chunks + finalize
 
     setImporting(true);
     setProgressStep(0);
     setProgressPct(0);
-    setProgressLabel(stages[0].label);
+    setProgressLabel("Preparing data...");
     setProgressElapsed(0);
 
     const startedAt = Date.now();
-
-    // Tick timer: update elapsed + advance stages based on elapsed ratio
-    const tickInterval = setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      setProgressElapsed(elapsed);
-      const ratio = Math.min(0.95, elapsed / estimatedDuration);
-      const currentStage = stages.findIndex((s, i) =>
-        ratio < (i + 1) / stages.length
-      );
-      const idx = currentStage < 0 ? stages.length - 1 : currentStage;
-      setProgressStep(stages[idx].step);
-      setProgressPct(stages[idx].pct);
-      setProgressLabel(stages[idx].label);
-    }, 120);
+    const elapsedTimer = setInterval(() => setProgressElapsed(Date.now() - startedAt), 200);
 
     try {
       const token = getAuthToken();
-      const res = await fetch(`${API_BASE}/roster-import/import`, {
+      const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+      // Step 1: start batch + insert buildings + types
+      setProgressStep(1);
+      setProgressLabel(`Creating batch + ${payload.buildings.length} buildings + ${payload.equipmentTypes.length} types...`);
+      setProgressPct(Math.round((1 / totalSteps) * 100));
+
+      const startRes = await fetch(`${API_BASE}/roster-import/start`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify(payload),
+        headers,
+        body: JSON.stringify({
+          fileName: payload.fileName,
+          buildings: payload.buildings,
+          equipmentTypes: payload.equipmentTypes,
+        }),
       });
+      if (!startRes.ok) throw new Error((await startRes.json()).message ?? "Start failed");
+      const startResult = await startRes.json();
+      const batchId = startResult.batchId;
 
-      if (!res.ok) throw new Error((await res.json()).message ?? "Import failed");
-      const result = await res.json();
+      // Step 2: import equipment in chunks
+      let totalInserted = 0;
+      let totalSkipped = 0;
+      const allErrors: string[] = [...(startResult.errors ?? [])];
 
-      // Jump to complete
-      clearInterval(tickInterval);
+      for (let i = 0; i < equipmentChunks.length; i++) {
+        const chunk = equipmentChunks[i];
+        const stepNum = i + 2;
+        setProgressStep(Math.min(4, 2 + Math.floor((i / equipmentChunks.length) * 3)));
+        setProgressLabel(`Importing equipment chunk ${i + 1}/${equipmentChunks.length} (${chunk.length} records)...`);
+        setProgressPct(Math.round((stepNum / totalSteps) * 100));
+
+        const chunkRes = await fetch(`${API_BASE}/roster-import/batches/${batchId}/equipment`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ equipment: chunk }),
+        });
+        if (!chunkRes.ok) {
+          const err = await chunkRes.json().catch(() => ({}));
+          throw new Error(err.message ?? `Chunk ${i + 1} failed`);
+        }
+        const chunkResult = await chunkRes.json();
+        totalInserted += chunkResult.inserted ?? 0;
+        totalSkipped += chunkResult.skipped ?? 0;
+        allErrors.push(...(chunkResult.errors ?? []));
+      }
+
+      // Step 3: finalize
+      setProgressStep(5);
+      setProgressLabel("Finalizing...");
+      setProgressPct(95);
+      const finalizeRes = await fetch(`${API_BASE}/roster-import/batches/${batchId}/finalize`, {
+        method: "POST",
+        headers,
+      });
+      if (!finalizeRes.ok) throw new Error((await finalizeRes.json()).message ?? "Finalize failed");
+      const finalResult = await finalizeRes.json();
+
+      // Done
+      clearInterval(elapsedTimer);
       setProgressStep(5);
       setProgressPct(100);
       setProgressLabel("Import complete!");
-      await new Promise((r) => setTimeout(r, 400)); // brief moment to show 100%
+      await new Promise((r) => setTimeout(r, 400));
 
-      setImportResult(result);
+      setImportResult({
+        batchId,
+        inserted: finalResult.inserted,
+        errors: allErrors,
+      });
       setPreview(null);
-      showToast(`Imported: ${result.inserted.buildings} buildings, ${result.inserted.equipment} equipment, ${result.inserted.equipmentTypes} types`, "success");
+      showToast(
+        `Imported: ${finalResult.inserted.buildings} buildings, ${finalResult.inserted.equipment} equipment, ${finalResult.inserted.equipmentTypes} types${totalSkipped > 0 ? ` (${totalSkipped} skipped)` : ""}`,
+        "success",
+      );
       fetchBatches();
     } catch (e: any) {
-      clearInterval(tickInterval);
+      clearInterval(elapsedTimer);
       showToast(e.message, "error");
     } finally {
-      clearInterval(tickInterval);
+      clearInterval(elapsedTimer);
       setImporting(false);
       setProgressStep(0);
       setProgressPct(0);
