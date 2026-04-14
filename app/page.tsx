@@ -2,6 +2,7 @@
 
 import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import SmartTextInput from "../components/SmartTextInput";
+import { Combobox } from "../components/Combobox";
 
 type Building = { id: string; name: string };
 type Equipment = { id: string; equipment_type: string; equipment_code: string };
@@ -955,19 +956,15 @@ export default function Home() {
                   <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><path d="M2 2h10v10H2z" stroke="currentColor" strokeWidth="1.2"/><path d="M5 1v2M9 1v2M2 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                     Building <span className="text-red-500">*</span>
+                    <span className="ml-auto text-[10px] font-normal text-slate-400">{buildings.length} available</span>
                   </label>
-                  <select
-                    className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                      stepErrors.building_id ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
-                    }`}
+                  <Combobox
+                    options={buildings.map((b) => ({ value: b.id, label: b.name }))}
                     value={formData.building_id}
-                    onChange={(event) => updateField("building_id", event.target.value)}
-                  >
-                    <option value="">Select building...</option>
-                    {buildings.map((building) => (
-                      <option key={building.id} value={building.id}>{building.name}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => updateField("building_id", v)}
+                    placeholder="Select building..."
+                    error={Boolean(stepErrors.building_id)}
+                  />
                   {stepErrors.building_id && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.building_id}</p>}
                 </div>
 
@@ -976,35 +973,32 @@ export default function Home() {
                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><rect x="3" y="2" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5h3M5.5 7.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                       Equipment Type <span className="text-red-500">*</span>
+                      <span className="ml-auto text-[10px] font-normal text-slate-400">{equipmentTypes.length} types</span>
                     </label>
-                    <select
-                      className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all ${
-                        stepErrors.equipment_type ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
-                      }`}
+                    <Combobox
+                      options={equipmentTypes.map((et) => ({ value: et, label: et }))}
                       value={formData.equipment_type}
-                      onChange={(event) => { updateField("equipment_type", event.target.value); updateField("equipmentId", ""); }}
-                    >
-                      <option value="">Select type...</option>
-                      {equipmentTypes.map((et) => <option key={et} value={et}>{et}</option>)}
-                    </select>
+                      onChange={(v) => { updateField("equipment_type", v); updateField("equipmentId", ""); }}
+                      placeholder="Select type..."
+                      error={Boolean(stepErrors.equipment_type)}
+                    />
                     {stepErrors.equipment_type && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipment_type}</p>}
                   </div>
                   <div>
                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/><path d="M7 4.5v5M4.5 7h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                       Equipment ID <span className="text-red-500">*</span>
+                      {formData.equipment_type && <span className="ml-auto text-[10px] font-normal text-slate-400">{equipmentList.length} units</span>}
                     </label>
-                    <select
-                      className={`form-input h-12 w-full rounded-xl border-2 bg-white px-3 text-base shadow-sm transition-all disabled:cursor-not-allowed disabled:bg-slate-100 ${
-                        stepErrors.equipmentId ? "error border-red-500 bg-red-50" : "border-slate-300 focus:border-[#1b3c7b] focus:ring-2 focus:ring-blue-100"
-                      }`}
+                    <Combobox
+                      options={equipmentList.map((eq) => ({ value: eq.id, label: eq.equipment_code }))}
                       value={formData.equipmentId}
+                      onChange={(v) => updateField("equipmentId", v)}
+                      placeholder="Select..."
                       disabled={!formData.equipment_type}
-                      onChange={(event) => updateField("equipmentId", event.target.value)}
-                    >
-                      <option value="">{formData.equipment_type ? "Select..." : "Select type first"}</option>
-                      {equipmentList.map((eq) => <option key={eq.id} value={eq.id}>{eq.equipment_code}</option>)}
-                    </select>
+                      disabledMessage="Select type first"
+                      error={Boolean(stepErrors.equipmentId)}
+                    />
                     {stepErrors.equipmentId && <p className="mt-1 text-xs font-medium text-red-600">{stepErrors.equipmentId}</p>}
                   </div>
                 </div>
