@@ -63,6 +63,123 @@ function formatCell(v: any, colName: string): string {
   return String(v);
 }
 
+// ─── Template validation ───────────────────────────────────────────────
+// Based on template file: List 6 - Rooster- Operation.xlsx
+const REQUIRED_MODEL_CODES = new Set(["ELV", "ESC", "HL", "FL", "SL", "DWT"]);
+
+interface ValidationIssue {
+  level: "error" | "warning" | "info";
+  message: string;
+  hint?: string;
+}
+
+function validateTemplate(sheets: SheetData[]): {
+  issues: ValidationIssue[];
+  canImport: boolean;
+} {
+  const issues: ValidationIssue[] = [];
+  const byName = Object.fromEntries(sheets.map((s) => [s.name, s]));
+
+  // ── Critical: must have schedule sheet (List-6 or Nov-Dec) with required cols
+  const scheduleSheets = [byName["List-6"], byName["Nov-Dec Combined Schedule"]].filter(Boolean);
+  if (scheduleSheets.length === 0) {
+    issues.push({
+      level: "error",
+      message: "Missing required sheet: 'List-6' or 'Nov-Dec Combined Schedule'",
+      hint: "File must contain at least one schedule sheet with Project Name, Lift No., and Model columns.",
+    });
+  } else {
+    const requiredCols = ["Project Name", "Lift No.", "Model"];
+    for (const sheet of scheduleSheets) {
+      const missing = requiredCols.filter((c) => !sheet.headers.includes(c));
+      if (missing.length > 0) {
+        issues.push({
+          level: "error",
+          message: `Sheet "${sheet.name}" missing columns: ${missing.join(", ")}`,
+          hint: `Add these column headers: ${missing.join(", ")}`,
+        });
+      }
+    }
+  }
+
+  // ── Critical: total valid rows > 0
+  let totalValidRows = 0;
+  let invalidModels = 0;
+  let emptyRows = 0;
+  const duplicates = new Map<string, number>();
+
+  for (const sheet of scheduleSheets) {
+    if (!sheet.headers.includes("Project Name") || !sheet.headers.includes("Model")) continue;
+    const liftCol = sheet.headers.includes("Lift No.") ? "Lift No." : "Lift No";
+    for (const row of sheet.rows) {
+      const project = String(row["Project Name"] ?? "").trim();
+      const lift = String(row[liftCol] ?? "").trim();
+      const model = String(row["Model"] ?? "").trim().toUpperCase();
+
+      if (!project || /standby|meeting|holiday/i.test(project)) continue;
+      if (!lift || !model) { emptyRows++; continue; }
+
+      if (!REQUIRED_MODEL_CODES.has(model)) invalidModels++;
+
+      const key = `${project.toLowerCase()}|${lift.toLowerCase()}`;
+      duplicates.set(key, (duplicates.get(key) ?? 0) + 1);
+      totalValidRows++;
+    }
+  }
+
+  if (totalValidRows === 0 && scheduleSheets.length > 0) {
+    issues.push({
+      level: "error",
+      message: "No valid data rows found",
+      hint: "Each row must have Project Name, Lift No., and Model filled in.",
+    });
+  }
+
+  // ── Warning: invalid model codes
+  if (invalidModels > 0) {
+    issues.push({
+      level: "warning",
+      message: `${invalidModels} row(s) have invalid Model code`,
+      hint: `Valid Model codes: ${[...REQUIRED_MODEL_CODES].join(", ")}. Invalid rows will be imported as-is.`,
+    });
+  }
+
+  // ── Warning: empty rows
+  if (emptyRows > 0) {
+    issues.push({
+      level: "warning",
+      message: `${emptyRows} row(s) missing Lift No. or Model — will be skipped`,
+    });
+  }
+
+  // ── Info: missing optional sheets
+  if (!byName["Sheet1"]) {
+    issues.push({
+      level: "info",
+      message: "Sheet1 (Equipment master) not found",
+      hint: "Location and detailed model metadata will not be imported.",
+    });
+  }
+  if (!byName["Check"]) {
+    issues.push({
+      level: "info",
+      message: "Check sheet (Project aliases) not found",
+      hint: "Project name normalization disabled — typos will create duplicate buildings.",
+    });
+  }
+
+  // ── Info: data size
+  if (totalValidRows > 0 && totalValidRows < 10) {
+    issues.push({
+      level: "warning",
+      message: `Only ${totalValidRows} record(s) found — file may be incomplete`,
+    });
+  }
+
+  const canImport = !issues.some((i) => i.level === "error");
+  return { issues, canImport };
+}
+
 function parseSheet(ws: XLSX.WorkSheet, sheetName: string): SheetData {
   const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: null });
   let headerIdx = 0;
@@ -244,6 +361,9 @@ export default function RosterUploadPage() {
   const [progressPct, setProgressPct] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const [progressElapsed, setProgressElapsed] = useState(0);
+
+  // Validation state
+  const [validation, setValidation] = useState<{ issues: ValidationIssue[]; canImport: boolean } | null>(null);
 
   function showToast(msg: string, type: "success" | "error") {
     setToast({ msg, type });
@@ -544,10 +664,13 @@ export default function RosterUploadPage() {
   async function handleFile(file: File) {
     setLoading(true);
     setError("");
+    setValidation(null);
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: false });
       const parsed = wb.SheetNames.map((n) => parseSheet(wb.Sheets[n], n));
+      const result = validateTemplate(parsed);
+      setValidation(result);
       setSheets(parsed);
       setFileName(file.name);
     } catch (e: any) {
@@ -609,6 +732,7 @@ export default function RosterUploadPage() {
     setSheets([]);
     setFileName("");
     setError("");
+    setValidation(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -616,9 +740,19 @@ export default function RosterUploadPage() {
   if (sheets.length === 0) {
     return (
       <div>
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-gray-800">Roster — Monthly Service Schedule</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Upload Excel to preview planning of monthly service schedule for contracted units</p>
+        <div className="mb-5 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Roster — Monthly Service Schedule</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Upload Excel to preview planning of monthly service schedule for contracted units</p>
+          </div>
+          <a
+            href="/roster-template.xlsx"
+            download
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 whitespace-nowrap"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3 6l4 4 4-4M2 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Download Template
+          </a>
         </div>
 
         <div
@@ -645,6 +779,7 @@ export default function RosterUploadPage() {
             <div>
               <p className="text-base font-semibold text-gray-800">Click to browse or drag Excel file here</p>
               <p className="text-sm text-gray-500 mt-1">Supports .xlsx, .xls, .xlsm</p>
+              <p className="text-xs text-gray-400 mt-2">Required sheets: List-6 (or Nov-Dec), with columns Project Name, Lift No., Model</p>
             </div>
             {loading && <p className="text-sm text-green-600 font-medium mt-2">Parsing file...</p>}
             {error && <p className="text-sm text-red-600 font-medium mt-2">{error}</p>}
@@ -740,8 +875,12 @@ export default function RosterUploadPage() {
         </div>
         <div className="flex items-center gap-2">
           {!preview && !importResult && (
-            <button onClick={handlePreview} disabled={previewing}
-              className="text-xs font-semibold px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+            <button
+              onClick={handlePreview}
+              disabled={previewing || !(validation?.canImport ?? true)}
+              title={!(validation?.canImport ?? true) ? "Fix validation errors before importing" : ""}
+              className="text-xs font-semibold px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
               {previewing ? "Analyzing..." : "Preview Import"}
             </button>
           )}
@@ -751,40 +890,128 @@ export default function RosterUploadPage() {
         </div>
       </div>
 
+      {/* Validation Panel */}
+      {validation && validation.issues.length > 0 && (
+        <div className={`rounded-xl border p-4 mb-5 ${
+          !validation.canImport
+            ? "bg-red-50 border-red-300"
+            : validation.issues.some((i) => i.level === "warning")
+              ? "bg-amber-50 border-amber-300"
+              : "bg-blue-50 border-blue-200"
+        }`}>
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="flex items-center gap-2">
+              {!validation.canImport ? (
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#dc2626" strokeWidth="1.5"/><path d="M10 6v5M10 14v.5" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              ) : validation.issues.some((i) => i.level === "warning") ? (
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 2L1 18h18L10 2z" stroke="#d97706" strokeWidth="1.5" strokeLinejoin="round"/><path d="M10 8v4M10 15v.5" stroke="#d97706" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#1e40af" strokeWidth="1.5"/><path d="M10 6v.5M10 9v5" stroke="#1e40af" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              )}
+              <p className={`text-sm font-bold ${
+                !validation.canImport ? "text-red-800" : validation.issues.some((i) => i.level === "warning") ? "text-amber-800" : "text-blue-800"
+              }`}>
+                {!validation.canImport
+                  ? "Template validation failed — cannot import"
+                  : validation.issues.some((i) => i.level === "warning")
+                    ? "Template validation — warnings found"
+                    : "Template validation — info"}
+              </p>
+            </div>
+            {!validation.canImport && (
+              <a
+                href="/roster-template.xlsx"
+                download
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-red-300 text-red-700 hover:bg-red-50 whitespace-nowrap flex items-center gap-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3 6l4 4 4-4M2 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Download Template
+              </a>
+            )}
+          </div>
+          <ul className="space-y-2">
+            {validation.issues.map((issue, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs">
+                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0 mt-0.5 ${
+                  issue.level === "error" ? "bg-red-200 text-red-800" :
+                  issue.level === "warning" ? "bg-amber-200 text-amber-800" :
+                  "bg-blue-200 text-blue-800"
+                }`}>
+                  {issue.level === "error" ? "✕" : issue.level === "warning" ? "!" : "i"}
+                </span>
+                <div className="flex-1">
+                  <p className={`font-semibold ${
+                    issue.level === "error" ? "text-red-900" :
+                    issue.level === "warning" ? "text-amber-900" :
+                    "text-blue-900"
+                  }`}>{issue.message}</p>
+                  {issue.hint && <p className="text-gray-600 mt-0.5">{issue.hint}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {!validation.canImport && (
+            <div className="mt-4 pt-3 border-t border-red-200">
+              <p className="text-xs font-semibold text-red-800 mb-1">How to fix:</p>
+              <ol className="text-xs text-red-700 space-y-0.5 list-decimal list-inside">
+                <li>Download the official template using the button above</li>
+                <li>Copy your data into the template, matching sheet names and column headers exactly</li>
+                <li>Re-upload the corrected file</li>
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* Import Preview Panel */}
-      {preview && !importResult && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
+      {preview && !importResult && (() => {
+        const totalNew = preview.buildings.new + preview.equipmentTypes.new + preview.equipment.new;
+        const nothingToImport = totalNew === 0;
+        return (
+        <div className={`border rounded-xl p-4 mb-5 ${nothingToImport ? "bg-amber-50 border-amber-300" : "bg-blue-50 border-blue-200"}`}>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-[280px]">
-              <p className="text-sm font-bold text-blue-900 mb-2">Import Preview</p>
+              <p className={`text-sm font-bold mb-2 ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>
+                {nothingToImport ? "Nothing to import — all records already exist" : "Import Preview"}
+              </p>
               <div className="grid grid-cols-3 gap-4 text-xs">
                 <div>
-                  <p className="text-blue-600 font-semibold">Buildings</p>
-                  <p className="text-blue-900 font-bold text-lg">+{preview.buildings.new} new</p>
-                  <p className="text-blue-500">{preview.buildings.existing} existing (skip)</p>
+                  <p className={`font-semibold ${nothingToImport ? "text-amber-600" : "text-blue-600"}`}>Buildings</p>
+                  <p className={`font-bold text-lg ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>+{preview.buildings.new} new</p>
+                  <p className={nothingToImport ? "text-amber-500" : "text-blue-500"}>{preview.buildings.existing} existing (skip)</p>
                 </div>
                 <div>
-                  <p className="text-blue-600 font-semibold">Equipment Types</p>
-                  <p className="text-blue-900 font-bold text-lg">+{preview.equipmentTypes.new} new</p>
-                  <p className="text-blue-500">{preview.equipmentTypes.existing} existing (skip)</p>
+                  <p className={`font-semibold ${nothingToImport ? "text-amber-600" : "text-blue-600"}`}>Equipment Types</p>
+                  <p className={`font-bold text-lg ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>+{preview.equipmentTypes.new} new</p>
+                  <p className={nothingToImport ? "text-amber-500" : "text-blue-500"}>{preview.equipmentTypes.existing} existing (skip)</p>
                 </div>
                 <div>
-                  <p className="text-blue-600 font-semibold">Equipment</p>
-                  <p className="text-blue-900 font-bold text-lg">+{preview.equipment.new} new</p>
-                  <p className={preview.equipment.conflicts.length > 0 ? "text-amber-600" : "text-blue-500"}>
+                  <p className={`font-semibold ${nothingToImport ? "text-amber-600" : "text-blue-600"}`}>Equipment</p>
+                  <p className={`font-bold text-lg ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>+{preview.equipment.new} new</p>
+                  <p className={preview.equipment.conflicts.length > 0 ? "text-amber-600" : (nothingToImport ? "text-amber-500" : "text-blue-500")}>
                     {preview.equipment.conflicts.length} conflict(s)
                   </p>
                 </div>
               </div>
+              {nothingToImport && (
+                <p className="text-xs text-amber-700 mt-3 leading-relaxed">
+                  Nothing new to import. All buildings, types, and equipment in this file already exist in the database.
+                  To import fresh data, either upload a file with new records or undo a previous import from the History below.
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <button onClick={() => setPreview(null)} className="text-xs font-semibold px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-white">
                 Cancel
               </button>
-              <button onClick={handleImport} disabled={importing}
-                className="text-xs font-semibold px-4 py-2 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50">
-                {importing ? "Importing..." : "Confirm Import"}
+              <button
+                onClick={handleImport}
+                disabled={importing || nothingToImport}
+                title={nothingToImport ? "Nothing new to import" : ""}
+                className="text-xs font-semibold px-4 py-2 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {importing ? "Importing..." : nothingToImport ? "Nothing to import" : "Confirm Import"}
               </button>
             </div>
           </div>
@@ -800,7 +1027,8 @@ export default function RosterUploadPage() {
             </details>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Import Result Panel */}
       {importResult && (
