@@ -386,7 +386,8 @@ export default function RosterUploadPage() {
   //   - Excel "Model" column (ELV / ESC / HL) → equipment_type
   //   - Excel "Lift No" column (PL1, FL1, ...) → equipment.code (equipment's business identifier)
   function buildImportPayload() {
-    const buildingsMap = new Map<string, { name: string; address?: string | null }>();
+    const buildingsMap = new Map<string, { name: string; address?: string | null; team?: string | null }>();
+    const buildingTeams = new Map<string, Set<string>>(); // building key → set of team names
     const typesMap = new Map<string, { name: string; code?: string | null }>();
     const equipmentMap = new Map<string, { buildingName: string; equipmentTypeName: string; code: string; model?: string | null }>();
 
@@ -411,6 +412,15 @@ export default function RosterUploadPage() {
         const modelCode = String(row["Model"] ?? "").trim().toUpperCase();
         if (!projectName || !liftNo || !modelCode) continue;
         if (/standby|meeting|holiday/i.test(projectName)) continue;
+
+        // Collect team per building
+        const teamRaw = String(row["Team"] ?? "").trim();
+        if (teamRaw && teamRaw !== "Team") {
+          const bKey = projectName.toLowerCase();
+          if (!buildingTeams.has(bKey)) buildingTeams.set(bKey, new Set());
+          // Split "A/B" into separate teams
+          teamRaw.split("/").map(t => t.trim()).filter(Boolean).forEach(t => buildingTeams.get(bKey)!.add(t));
+        }
 
         // Building
         if (!buildingsMap.has(projectName.toLowerCase())) {
@@ -460,6 +470,12 @@ export default function RosterUploadPage() {
           existingEq.model = typeCode;
         }
       }
+    }
+
+    // Apply aggregated teams to buildings
+    for (const [key, teams] of buildingTeams) {
+      const b = buildingsMap.get(key);
+      if (b) b.team = [...teams].sort().join(", ");
     }
 
     return {
@@ -968,6 +984,10 @@ export default function RosterUploadPage() {
       {preview && !importResult && (() => {
         const totalNew = preview.buildings.new + preview.equipmentTypes.new + preview.equipment.new;
         const nothingToImport = totalNew === 0;
+        // Compute team stats from payload
+        const payload = buildImportPayload();
+        const teamsFromPayload = [...new Set(payload.buildings.map(b => b.team).filter(Boolean) as string[])].sort();
+        const buildingsWithTeam = payload.buildings.filter(b => b.team).length;
         return (
         <div className={`border rounded-xl p-4 mb-5 ${nothingToImport ? "bg-amber-50 border-amber-300" : "bg-blue-50 border-blue-200"}`}>
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -975,7 +995,7 @@ export default function RosterUploadPage() {
               <p className={`text-sm font-bold mb-2 ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>
                 {nothingToImport ? "Nothing to import — all records already exist" : "Import Preview"}
               </p>
-              <div className="grid grid-cols-3 gap-4 text-xs">
+              <div className="grid grid-cols-4 gap-4 text-xs">
                 <div>
                   <p className={`font-semibold ${nothingToImport ? "text-amber-600" : "text-blue-600"}`}>Buildings</p>
                   <p className={`font-bold text-lg ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>+{preview.buildings.new} new</p>
@@ -992,6 +1012,15 @@ export default function RosterUploadPage() {
                   <p className={preview.equipment.conflicts.length > 0 ? "text-amber-600" : (nothingToImport ? "text-amber-500" : "text-blue-500")}>
                     {preview.equipment.conflicts.length} conflict(s)
                   </p>
+                </div>
+                <div>
+                  <p className={`font-semibold ${nothingToImport ? "text-amber-600" : "text-blue-600"}`}>Teams</p>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    {teamsFromPayload.length > 0
+                      ? teamsFromPayload.map(t => t.split(",").map(s => s.trim())).flat().filter((v, i, a) => a.indexOf(v) === i).map(t => <TeamBadge key={t} team={t} />)
+                      : <span className={`text-lg font-bold ${nothingToImport ? "text-amber-900" : "text-blue-900"}`}>—</span>}
+                  </div>
+                  <p className={nothingToImport ? "text-amber-500" : "text-blue-500"}>{buildingsWithTeam} buildings assigned</p>
                 </div>
               </div>
               {nothingToImport && (

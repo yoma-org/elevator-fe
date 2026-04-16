@@ -52,7 +52,7 @@ const ANIM_STYLES = `
 // ─── types ─────────────────────────────────────────────────────────────────────
 
 interface WorkOrder {
-  id: string; building: string; equipment_code: string; equipment_type: string;
+  id: string; building: string; building_team: string | null; equipment_code: string; equipment_type: string;
   status: string; maintenance_type: string; technician_name: string;
   arrival_date_time: string; findings: string | null; work_performed: string | null;
   parts_used: Array<{ name: string; quantity: number; status?: 'replaced' | 'needs-replacement' }> | null;
@@ -65,6 +65,9 @@ interface WorkOrderDetail extends WorkOrder {
     categories: Array<{ category: string; items: Array<{ label: string; checked: boolean; status?: string }> }> } | null;
   remarks: string | null;
   internal_notes: Array<{ id: string; at: string; author: string; kind: string; text: string }> | null;
+  completion_date_time: string | null;
+  customer_name: string | null;
+  customer_title: string | null;
   photos: Array<{ name: string; mimeType: string; size: number; url?: string; dataUrl?: string }> | null;
   technician_signature: string | null;
   customer_signature: string | null;
@@ -710,6 +713,7 @@ function WorkOrderCard({ order, onClick, index }: { order: WorkOrder; onClick: (
         <div className="flex items-center gap-1.5">
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><path d="M2 2h8v8H2z" stroke="currentColor" strokeWidth="1.1"/><path d="M4 1v2M8 1v2M2 5h8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
           <span className="text-gray-700 font-medium">{order.building}</span>
+          {order.building_team && <span className="ml-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-semibold">Team {order.building_team}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-gray-400 shrink-0"><rect x="3" y="1" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M5 8h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
@@ -1204,14 +1208,17 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   <InfoRow label="Report Code" value={detail.id ?? "—"} />
                   <InfoRow label="Status" value={getStatusCfg(detail.status).label} />
                   <InfoRow label="Building Name" value={detail.building} />
+                  {detail.building_team && <InfoRow label="Team" value={detail.building_team} />}
                   <InfoRow label="Lift No." value={detail.equipment_code} />
                   <InfoRow label="Equipment Type" value={detail.equipment_type} />
                   <InfoRow label="Maintenance Type" value={detail.maintenance_type} />
-                  <InfoRow label="Technician" value={detail.technician_name} />
                   <InfoRow label="Assigned To" value={detail.assigned_to ?? "—"} />
                   <InfoRow label="Arrival Date" value={fmtDate(detail.arrival_date_time)} />
                   <InfoRow label="Arrival Time" value={fmtTime(detail.arrival_date_time)} />
+                  {detail.completion_date_time && <InfoRow label="Completion Date" value={fmtDate(detail.completion_date_time)} />}
+                  {detail.completion_date_time && <InfoRow label="Completion Time" value={fmtTime(detail.completion_date_time)} />}
                   <InfoRow label="Priority" value={detail.priority} />
+                  {detail.customer_name && <InfoRow label="Building Representative" value={`${detail.customer_name}${detail.customer_title ? ` — ${detail.customer_title}` : ""}`} />}
                 </div>
               </Section>
 
@@ -1612,7 +1619,7 @@ function AdminDashboardInner() {
   const [buildingFilter, setBuildingFilter] = useState("all");
   const [projectNameFilter, setProjectNameFilter] = useState("");
   const [partsFilter, setPartsFilter] = useState("");
-  const [statsFilter, setStatsFilter] = useState<"myQueue" | "projectsThisMonth" | "activeJobs" | null>(null);
+  const statsFilter = null; // stats cards removed
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
 
   // Debounced search values
@@ -1634,13 +1641,9 @@ function AdminDashboardInner() {
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
       if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
-      const [ordersRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`, { headers: authHeaders }),
-        fetch(`${API_BASE}/maintenance-reports/admin/stats?${params}`, { headers: authHeaders }),
-      ]);
+      const ordersRes = await fetch(`${API_BASE}/maintenance-reports/admin/list?${params}`, { headers: authHeaders });
       if (!ordersRes.ok) { console.error("Failed to fetch orders:", ordersRes.status); return; }
       setOrders(await ordersRes.json());
-      setStats(await statsRes.json());
     } catch (e) {
       console.error(e);
     } finally {
@@ -1648,7 +1651,7 @@ function AdminDashboardInner() {
     }
   }, [fromDate, toDate, statusFilter, token]);
 
-  useEffect(() => { setCurrentPage(1); setStatsFilter(null); void fetchData(); }, [fetchData]);
+  useEffect(() => { setCurrentPage(1); void fetchData(); }, [fetchData]);
 
   const uniqueBuildings = useMemo(() => [...new Set(orders.map(o => o.building).filter(Boolean))].sort(), [orders]);
   const uniqueProjectNames = useMemo(() => [...new Set(orders.map(o => o.maintenance_type).filter(Boolean))].sort(), [orders]);
@@ -1676,21 +1679,9 @@ function AdminDashboardInner() {
       filtered = filtered.filter(o => o.parts_used?.some(p => p.name.toLowerCase().includes(q)));
     }
 
-    if (statsFilter) {
-      filtered = filtered.filter((o) => {
-        if (statsFilter === "myQueue") return o.status !== "invoice-ready" && o.status !== "closed" && o.status !== "cancelled";
-        if (statsFilter === "activeJobs") return o.status === "pc-review";
-        if (statsFilter === "projectsThisMonth") {
-          const now = new Date();
-          const d = new Date(o.arrival_date_time);
-          return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
-        }
-        return true;
-      });
-    }
 
     return [...filtered].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [orders, debouncedSearch, debouncedBuilding, debouncedProject, debouncedParts, statsFilter]);
+  }, [orders, debouncedSearch, debouncedBuilding, debouncedProject, debouncedParts]);
 
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -1785,7 +1776,7 @@ function AdminDashboardInner() {
         </div>
 
         {/* Row 3: Active filter pills */}
-        {(searchQuery || (buildingFilter && buildingFilter !== "all") || projectNameFilter || partsFilter || fromDate || toDate || statusFilter !== "all" || statsFilter) && (
+        {(searchQuery || (buildingFilter && buildingFilter !== "all") || projectNameFilter || partsFilter || fromDate || toDate || statusFilter !== "all") && (
           <div className="px-4 py-2 flex flex-wrap items-center gap-2 border-t border-gray-100 bg-white">
             <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mr-1">Filters:</span>
             {fromDate && (
@@ -1809,11 +1800,8 @@ function AdminDashboardInner() {
             {partsFilter && (
               <span className="filter-pill">Parts: {partsFilter}<button onClick={() => setPartsFilter("")}><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg></button></span>
             )}
-            {statsFilter && (
-              <span className="filter-pill">Stat: {statsFilter === "myQueue" ? "My Queue" : statsFilter === "projectsThisMonth" ? "This Month" : "Active"}<button onClick={() => setStatsFilter(null)}><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg></button></span>
-            )}
             <button
-              onClick={() => { setSearchQuery(""); setBuildingFilter("all"); setProjectNameFilter(""); setPartsFilter(""); setFromDate(""); setToDate(""); setStatusFilter("all"); setStatsFilter(null); setCurrentPage(1); }}
+              onClick={() => { setSearchQuery(""); setBuildingFilter("all"); setProjectNameFilter(""); setPartsFilter(""); setFromDate(""); setToDate(""); setStatusFilter("all"); setCurrentPage(1); }}
               className="text-[10px] text-red-500 hover:text-red-700 font-semibold transition-colors ml-auto flex items-center gap-1"
             >
               <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
@@ -1823,20 +1811,12 @@ function AdminDashboardInner() {
         )}
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-        <StatCard iconKey="queue" label="My Queue" value={stats?.myQueue ?? 0} active={statsFilter === "myQueue"} onClick={() => { setStatsFilter(f => f === "myQueue" ? null : "myQueue"); setCurrentPage(1); }} />
-        <StatCard iconKey="projects" label="Projects This Month" value={stats?.projectsThisMonth ?? 0} active={statsFilter === "projectsThisMonth"} onClick={() => { setStatsFilter(f => f === "projectsThisMonth" ? null : "projectsThisMonth"); setCurrentPage(1); }} />
-        <StatCard iconKey="active" label="Active Jobs" value={stats?.activeJobs ?? 0} active={statsFilter === "activeJobs"} onClick={() => { setStatsFilter(f => f === "activeJobs" ? null : "activeJobs"); setCurrentPage(1); }} />
-        <StatCard iconKey="response" label="Avg Response" value={stats?.avgResponseTimeMin ?? 45} unit="MIN" ok={true} />
-        <StatCard iconKey="duration" label="Avg Duration" value={stats?.avgWorkDurationHrs ?? 2.3} unit="HRS" ok={true} />
-      </div>
 
       {/* Work orders header */}
       <div className="rounded-t-xl px-5 py-3 flex items-center justify-between" style={{ backgroundColor: "#1a3a2a" }}>
         <div className="flex items-center gap-3">
           <h2 className="text-white font-bold text-sm uppercase tracking-widest">
-            {statsFilter === "myQueue" ? "My Queue" : statsFilter === "projectsThisMonth" ? "Projects This Month" : statsFilter === "activeJobs" ? "Active Jobs" : "Work Orders"}
+            {"Work Orders"}
           </h2>
           {!loading && (
             <span className="text-green-400/80 text-xs font-medium bg-white/10 px-2 py-0.5 rounded-full">
@@ -1854,12 +1834,6 @@ function AdminDashboardInner() {
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 3h12M1 7h12M1 11h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
             </button>
           </div>
-          {statsFilter && (
-            <button onClick={() => { setStatsFilter(null); setCurrentPage(1); }} className="text-xs text-green-300 hover:text-white transition-colors flex items-center gap-1">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-              Clear stat filter
-            </button>
-          )}
         </div>
       </div>
 
@@ -1916,7 +1890,7 @@ function AdminDashboardInner() {
                         className="table-row cursor-pointer border-b border-gray-50 last:border-0"
                         style={{ animation: `fadeIn .2s ${i * 0.02}s ease both` }}>
                         <td className="px-3 py-2.5 font-mono font-bold text-gray-800 text-xs whitespace-nowrap">{order.id ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-gray-700 font-medium text-xs">{order.building}</td>
+                        <td className="px-3 py-2.5 text-gray-700 font-medium text-xs">{order.building}{order.building_team && <span className="ml-1 px-1 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-semibold">Team {order.building_team}</span>}</td>
                         <td className="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell">{order.equipment_code}</td>
                         <td className="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell">{order.technician_name}</td>
                         <td className="px-3 py-2.5"><span className="text-[10px] font-semibold uppercase text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{order.maintenance_type}</span></td>

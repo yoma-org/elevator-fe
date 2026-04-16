@@ -4,7 +4,7 @@ import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 
 import SmartTextInput from "../components/SmartTextInput";
 import { Combobox } from "../components/Combobox";
 
-type Building = { id: string; name: string };
+type Building = { id: string; name: string; team: string | null };
 type Equipment = { id: string; equipment_type: string; equipment_code: string };
 type PartItem = { name: string; quantity: string };
 type PhotoItem = {
@@ -145,7 +145,7 @@ const createInitialFormData = () => ({
   equipmentId: "",
   maintenance_type: "Scheduled/Preventive Maintenance",
   arrival_date_time: getLocalDateTimeParts().dateTime,
-  technician_name: "Ko Aung Mya Oo",
+  technician_name: "",
   checklistState: {} as Record<string, string[]>,
   issuesFound: "",
   partsReplaced: "no-change",
@@ -844,6 +844,11 @@ export default function Home() {
           size: photo.size,
           dataUrl: photo.dataUrl,
         })),
+        completion_date_time: formData.completionDate && formData.completionTime
+          ? new Date(`${formData.completionDate}T${formData.completionTime}`).toISOString()
+          : undefined,
+        customer_name: formData.customerName || undefined,
+        customer_title: formData.customerTitle || undefined,
         technician_signature: formData.techSignature,
         customer_signature: formData.customer_signature,
       };
@@ -973,6 +978,10 @@ export default function Home() {
                       updateField("building_id", v);
                       updateField("equipment_type", "");
                       updateField("equipmentId", "");
+                      const selectedBuilding = buildings.find((b) => b.id === v);
+                      if (selectedBuilding?.team) {
+                        updateField("technician_name", `Team ${selectedBuilding.team}`);
+                      }
                     }}
                     placeholder="Select building..."
                     error={Boolean(stepErrors.building_id)}
@@ -1064,11 +1073,18 @@ export default function Home() {
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-slate-400"><circle cx="7" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/><path d="M2 12c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.2"/></svg>
                     Technician
                   </label>
-                  <input
-                    className="h-12 w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-3 text-base text-slate-500 cursor-not-allowed"
-                    value={formData.technician_name}
-                    readOnly
-                  />
+                  <div className="relative">
+                    <input
+                      className={`h-12 w-full rounded-xl border-2 px-3 text-base ${formData.technician_name ? "border-slate-200 bg-slate-50 text-slate-700" : "border-slate-200 bg-slate-50 text-slate-400"} cursor-not-allowed`}
+                      value={formData.technician_name || (formData.building_id ? "No team assigned" : "Select a building first")}
+                      readOnly
+                    />
+                    {formData.technician_name && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 text-[11px] font-bold border border-indigo-200">
+                        {formData.technician_name}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </fieldset>
             </div>
