@@ -1214,18 +1214,6 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   <InfoRow label="Priority" value={detail.priority} />
                 </div>
               </Section>
-              <Section title="SLA Performance">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-green-50 rounded-lg p-3 text-center">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600 mb-1">Response Time</p>
-                    <p className="text-lg font-bold text-green-800">45 <span className="text-xs font-semibold text-green-600">min</span></p>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 mb-1">Work Duration</p>
-                    <p className="text-lg font-bold text-blue-800">2.3 <span className="text-xs font-semibold text-blue-600">hrs</span></p>
-                  </div>
-                </div>
-              </Section>
 
               {editing && (
                 <>
@@ -1318,11 +1306,31 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                   {detail.checklist_results.categories.map((cat, ci) => (
                     <div key={ci} className="mb-3">
                       <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{cat.category}</p>
-                      <ul className="space-y-0.5">{cat.items.map((item, ii) => (
-                        <li key={ii} className="flex items-center gap-2 text-xs text-gray-700">
-                          <span>{item.checked ? "✅" : "⬜"}</span><span>{item.label}</span>
-                        </li>
-                      ))}</ul>
+                      <ul className="space-y-1">{cat.items.map((item, ii) => {
+                        const statuses = (item as { status?: string }).status?.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) ?? [];
+                        return (
+                          <li key={ii} className="flex items-center gap-2 text-xs text-gray-700">
+                            <span>{item.checked ? "✅" : "⬜"}</span>
+                            <span className="flex-1">{item.label}</span>
+                            <span className="flex gap-1 flex-wrap justify-end">
+                              {statuses.length === 0 && !item.checked && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-400">—</span>
+                              )}
+                              {statuses.map((s, si) => (
+                                <span key={si} className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
+                                  s === "good" ? "bg-green-100 text-green-700" :
+                                  s === "adjusted" ? "bg-blue-100 text-blue-700" :
+                                  s === "repair" ? "bg-red-100 text-red-700" :
+                                  s === "na" ? "bg-gray-100 text-gray-500" :
+                                  "bg-gray-100 text-gray-600"
+                                }`}>
+                                  {s === "good" ? "✓ Good" : s === "adjusted" ? "○ Adjusted" : s === "repair" ? "✕ Repair/Replace" : s === "na" ? "/ N/A" : s}
+                                </span>
+                              ))}
+                            </span>
+                          </li>
+                        );
+                      })}</ul>
                     </div>
                   ))}
                 </Section>
