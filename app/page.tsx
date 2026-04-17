@@ -1104,11 +1104,6 @@ export default function Home() {
                 </div>
               )}
 
-              {formData.equipment_type && dynamicChecklist && !isChecklistLoading && (
-                <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
-                  Using the checklist template configured in the admin portal for this equipment type.
-                </div>
-              )}
 
               {selectedChecklist.map((group, groupIndex) => (
                 <div key={group.category} className="mb-6">

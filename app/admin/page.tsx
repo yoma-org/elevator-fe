@@ -1275,7 +1275,24 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
 
               {detail.findings && <Section title="Issue Description"><p className="text-sm text-gray-700 leading-relaxed">{detail.findings}</p></Section>}
               {detail.work_performed && <Section title="Action Taken"><p className="text-sm text-gray-700 leading-relaxed">{detail.work_performed}</p></Section>}
-              {detail.remarks && <Section title="Remarks"><p className="text-sm text-gray-700 leading-relaxed">{detail.remarks}</p></Section>}
+              {detail.remarks && (
+                <Section title="Remarks">
+                  <div className="space-y-2">
+                    {detail.remarks.split(" | ").map((part, i) => {
+                      const [label, ...rest] = part.split(": ");
+                      const value = rest.join(": ");
+                      return value ? (
+                        <div key={i}>
+                          <span className="text-xs font-semibold text-gray-500 uppercase">{label}</span>
+                          <p className="text-sm text-gray-700 leading-relaxed mt-0.5">{value}</p>
+                        </div>
+                      ) : (
+                        <p key={i} className="text-sm text-gray-700 leading-relaxed">{part}</p>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
               {!editing && isEditable && (
                 <button onClick={startEditing} className="btn-green px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ backgroundColor: "#1a7a4a" }}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8.5V10h1.5L9.2 4.3 7.7 2.8 2 8.5zM10.3 3.2l-1.5-1.5.7-.7 1.5 1.5-.7.7z" fill="currentColor"/></svg>
