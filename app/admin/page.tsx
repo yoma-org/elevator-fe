@@ -142,15 +142,6 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   doc.setFillColor(...GREEN);
   doc.rect(0, 0, pageW, 22, "F");
 
-  // Company name
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text("YOMA ELEVATOR", mx + 2, 9);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text("Yoma Elevator Co., Ltd.", mx + 2, 15);
-
   // Title centered
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
@@ -172,7 +163,7 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   // ═══════════════════════════════════════════════════════════════════════════════
   // 1. EQUIPMENT INFORMATION
   // ═══════════════════════════════════════════════════════════════════════════════
-  sectionTitle("1", "Equipment Information");
+  sectionTitle("1", "General Information");
 
   autoTable(doc, {
     startY: y,
@@ -181,6 +172,7 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
       ["Building", d.building ?? "—", "Car / Lift No.", d.equipment_code ?? "—", "Priority", d.priority ?? "—"],
       ["Maintenance Type", d.maintenance_type ?? "—", "Technician", d.technician_name ?? "—", "Assigned To", d.assigned_to ?? "—"],
       ["Arrival Date", d.arrival_date_time ? fmtDate(d.arrival_date_time) : "—", "Arrival Time", d.arrival_date_time ? fmtTime(d.arrival_date_time) : "—", "Submitted", d.submitted_at ? fmtDate(d.submitted_at) : "—"],
+      ["Completion Date", d.completion_date_time ? fmtDate(d.completion_date_time) : "—", "Completion Time", d.completion_date_time ? fmtTime(d.completion_date_time) : "—", "", ""],
     ],
     theme: "grid",
     styles: { fontSize: 8, cellPadding: 2.5 },
@@ -320,11 +312,20 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   if (d.remarks) {
     sectionTitle("5", "Remarks");
 
+    const remarkRows = d.remarks.split(" | ").map((part) => {
+      const [label, ...rest] = part.split(": ");
+      const value = rest.join(": ");
+      return value ? [label, value] : ["", part];
+    });
+
     autoTable(doc, {
       startY: y,
-      body: [[d.remarks]],
+      head: [["Field", "Details"]],
+      body: remarkRows,
       theme: "grid",
       styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [240, 240, 240], textColor: [80, 80, 80], fontStyle: "bold", fontSize: 7 },
+      columnStyles: { 0: { cellWidth: 35, fontStyle: "bold", textColor: [100, 100, 100] } },
       margin: { left: mx, right: mx },
     });
     y = (doc as any).lastAutoTable.finalY + 6;
@@ -336,39 +337,7 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   const mmpr = mmprResponse?.mmpr;
   let sectionNum = 6;
 
-  // 6. Break Armature Gap
-  if (mmpr?.break_armature_gap?.length > 0) {
-    sectionTitle(String(sectionNum), "Break Armature Gap Setting Value");
-    autoTable(doc, {
-      startY: y,
-      head: [["Item", "Standard Value", "Checked Value", "Date", "Checked By"]],
-      body: mmpr.break_armature_gap.map((r: any) => [r.item ?? "", r.standardValue ?? "", r.checkedValue ?? "", r.date ?? "", r.checkedBy ?? ""]),
-      theme: "grid",
-      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      margin: { left: mx, right: mx },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-    sectionNum++;
-  }
-
-  // 7. Rope Investigation
-  if (mmpr?.rope_investigation?.length > 0) {
-    sectionTitle(String(sectionNum), "Rope Investigation Result");
-    autoTable(doc, {
-      startY: y,
-      head: [["Sheave Position", "Ropes Checked", "Result", "Date", "Checked By"]],
-      body: mmpr.rope_investigation.map((r: any) => [r.sheavePosition ?? "", r.ropesChecked ?? "", r.result ?? "", r.checkedDate ?? "", r.checkedBy ?? ""]),
-      theme: "grid",
-      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      margin: { left: mx, right: mx },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-    sectionNum++;
-  }
-
-  // 8. Work Instructions
+  // 6. Work Instructions
   if (mmpr?.work_instructions?.length > 0) {
     sectionTitle(String(sectionNum), "Work Instruction in Regular Service Periods");
     autoTable(doc, {
@@ -1484,34 +1453,6 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                 <div className="space-y-3 py-2">{[1,2,3].map(i => <div key={i} className="skeleton h-4 w-full" style={{ width: `${60 + i * 10}%` }} />)}</div>
               ) : (
                 <div className="space-y-5">
-                  {/* Break Armature Gap */}
-                  <MmprSection title="Break Armature Gap Setting" onAdd={() => addMmprRow("break_armature_gap", { item: "", standardValue: "", checkedValue: "", date: "", checkedBy: "" })}>
-                    {(mmprDraft.break_armature_gap ?? []).map((row: any, i: number) => (
-                      <div key={i} className="grid grid-cols-6 gap-2 items-center">
-                        <input className={editInputCls} placeholder="Item" value={row.item ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { item: e.target.value })} />
-                        <input className={editInputCls} placeholder="Standard" value={row.standardValue ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { standardValue: e.target.value })} />
-                        <input className={editInputCls} placeholder="Checked" value={row.checkedValue ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { checkedValue: e.target.value })} />
-                        <input className={editInputCls} type="date" value={row.date ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { date: e.target.value })} />
-                        <input className={editInputCls} placeholder="Checked By" value={row.checkedBy ?? ""} onChange={e => updateMmprRow("break_armature_gap", i, { checkedBy: e.target.value })} />
-                        <button onClick={() => removeMmprRow("break_armature_gap", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
-                      </div>
-                    ))}
-                  </MmprSection>
-
-                  {/* Rope Investigation */}
-                  <MmprSection title="Rope Investigation Result" onAdd={() => addMmprRow("rope_investigation", { sheavePosition: "", ropesChecked: "", checkedDate: "", checkedBy: "", result: "" })}>
-                    {(mmprDraft.rope_investigation ?? []).map((row: any, i: number) => (
-                      <div key={i} className="grid grid-cols-6 gap-2 items-center">
-                        <input className={editInputCls} placeholder="Sheave Position" value={row.sheavePosition ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { sheavePosition: e.target.value })} />
-                        <input className={editInputCls} placeholder="Ropes Checked" value={row.ropesChecked ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { ropesChecked: e.target.value })} />
-                        <input className={editInputCls} placeholder="Result" value={row.result ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { result: e.target.value })} />
-                        <input className={editInputCls} type="date" value={row.checkedDate ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { checkedDate: e.target.value })} />
-                        <input className={editInputCls} placeholder="Checked By" value={row.checkedBy ?? ""} onChange={e => updateMmprRow("rope_investigation", i, { checkedBy: e.target.value })} />
-                        <button onClick={() => removeMmprRow("rope_investigation", i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
-                      </div>
-                    ))}
-                  </MmprSection>
-
                   {/* Work Instructions */}
                   <MmprSection title="Work Instruction in Regular Service" onAdd={() => addMmprRow("work_instructions", { date: "", name: "", item: "", contents: "" })}>
                     {(mmprDraft.work_instructions ?? []).map((row: any, i: number) => (
