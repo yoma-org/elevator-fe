@@ -142,17 +142,19 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   doc.setFillColor(...GREEN);
   doc.rect(0, 0, pageW, 22, "F");
 
-  // Title centered
+  // Title centered (white text on green header)
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
   doc.text("MAINTENANCE MANAGEMENT PLANNING RECORD", pageW / 2, 10, { align: "center" });
 
-  // Report code + status right
+  // Report code + status right (white text)
   doc.setFontSize(11);
   doc.text(d.id ?? "", pageW - mx - 2, 9, { align: "right" });
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.text(getStatusCfg(d.status).label, pageW - mx - 2, 15, { align: "right" });
+  doc.setTextColor(...DARK);
 
   // Thin accent line
   doc.setFillColor(0, 180, 100);
@@ -234,19 +236,26 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
     const cr = d.checklist_results;
     sectionTitle("3", `Maintenance Record — Checklist (${cr.checkedCount}/${cr.totalCount})`);
 
-    // Legend
-    doc.setFontSize(7);
+    // Legend — same font family as section title, with spacing
+    y += 4;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...DARK);
+    doc.text("Legend:", mx + 3, y);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(...GRAY);
-    doc.text("Good (\u2713)    Adjusted (O)    Repair (X)    N/A    — Not checked", mx + 3, y);
-    y += 5;
+    doc.text("\u2713 = Good     O = Adjusted     X = Repair/Replace     N/A = Not Applicable     — = Not checked", mx + 22, y);
+    y += 8;
 
     const checkRows: (string | { content: string; styles?: Record<string, unknown> })[][] = [];
     let rowNum = 0;
 
     cr.categories.forEach(cat => {
-      // Category header row
-      checkRows.push([{ content: cat.category.toUpperCase(), styles: { fontStyle: "bold" as const, fillColor: [240, 248, 240] as [number, number, number], colSpan: 4 } }, "", "", ""]);
+      // Category header row — full-width merged cell like Excel
+      checkRows.push([{
+        content: cat.category.toUpperCase(),
+        colSpan: 4,
+        styles: { fontStyle: "bold" as const, fillColor: LIGHT_GREEN as [number, number, number], textColor: GREEN as [number, number, number], fontSize: 8, cellPadding: 3 },
+      } as any, "", "", ""]);
       cat.items.forEach(item => {
         rowNum++;
         const sym = statusSymbol(item.status);
@@ -270,7 +279,7 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
       body: checkRows,
       theme: "grid",
       headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 7.5, cellPadding: 2 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
       columnStyles: {
         0: { cellWidth: 12, halign: "center" },
         1: { cellWidth: 160 },
@@ -320,94 +329,25 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
 
     autoTable(doc, {
       startY: y,
-      head: [["Field", "Details"]],
-      body: remarkRows,
+      head: [["No.", "Field", "Details"]],
+      body: remarkRows.map((r, i) => [String(i + 1), r[0], r[1]]),
       theme: "grid",
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [240, 240, 240], textColor: [80, 80, 80], fontStyle: "bold", fontSize: 7 },
-      columnStyles: { 0: { cellWidth: 35, fontStyle: "bold", textColor: [100, 100, 100] } },
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 35, fontStyle: "bold", textColor: GRAY, fillColor: LIGHT_GREEN },
+        2: { cellWidth: contentW - 47 },
+      },
       margin: { left: mx, right: mx },
     });
     y = (doc as any).lastAutoTable.finalY + 6;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // MMPR SECTIONS (6-11) — only if mmprResponse provided
+  // 6. SIGNATURES
   // ═══════════════════════════════════════════════════════════════════════════════
-  const mmpr = mmprResponse?.mmpr;
   let sectionNum = 6;
-
-  // 6. Work Instructions
-  if (mmpr?.work_instructions?.length > 0) {
-    sectionTitle(String(sectionNum), "Work Instruction in Regular Service Periods");
-    autoTable(doc, {
-      startY: y,
-      head: [["No.", "Date", "Name", "Item", "Contents"]],
-      body: mmpr.work_instructions.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.name ?? "", r.item ?? "", r.contents ?? ""]),
-      theme: "grid",
-      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
-      margin: { left: mx, right: mx },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-    sectionNum++;
-  }
-
-  // 9. Work Details
-  if (mmpr?.work_details?.length > 0) {
-    sectionTitle(String(sectionNum), "Work Details in Regular Service Periods");
-    autoTable(doc, {
-      startY: y,
-      head: [["No.", "Date", "Name", "Item", "Contents"]],
-      body: mmpr.work_details.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.name ?? "", r.item ?? "", r.contents ?? ""]),
-      theme: "grid",
-      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
-      margin: { left: mx, right: mx },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-    sectionNum++;
-  }
-
-  // 10. Major Repairs
-  if (mmpr?.major_repairs?.length > 0) {
-    sectionTitle(String(sectionNum), "Major Repair Works Record");
-    autoTable(doc, {
-      startY: y,
-      head: [["No.", "Date", "Work Done By", "Checked By", "Details of Works Carried Out", "Remarks"]],
-      body: mmpr.major_repairs.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.workDoneBy ?? "", r.checkedBy ?? "", r.details ?? "", r.remarks ?? ""]),
-      theme: "grid",
-      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
-      margin: { left: mx, right: mx },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-    sectionNum++;
-  }
-
-  // 11. Call Back Records
-  if (mmpr?.call_back_records?.length > 0) {
-    sectionTitle(String(sectionNum), "Call Back Record");
-    autoTable(doc, {
-      startY: y,
-      head: [["No.", "Date", "PIC", "Checked By", "Received", "Arrived", "Completion", "Trouble Found", "Action Taken"]],
-      body: mmpr.call_back_records.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.pic ?? "", r.checkedBy ?? "", r.received ?? "", r.arrived ?? "", r.completion ?? "", r.troubleFound ?? "", r.actionTaken ?? ""]),
-      theme: "grid",
-      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      styles: { fontSize: 7, cellPadding: 2 },
-      columnStyles: { 0: { cellWidth: 10, halign: "center" } },
-      margin: { left: mx, right: mx },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-    sectionNum++;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // SIGNATURES
-  // ═══════════════════════════════════════════════════════════════════════════════
   if (d.technician_signature || d.customer_signature) {
     sectionTitle(String(sectionNum), "Signatures");
 
@@ -443,7 +383,118 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
       try { doc.addImage(d.customer_signature, "PNG", rightX + (colW - 4 - sigW) / 2, y + 8, sigW, sigH); } catch {}
     }
 
-    y += sigH + 20;
+    y += sigH + 30;
+    sectionNum++;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // MMPR DATA SECTIONS — after Signatures
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const mmpr = mmprResponse?.mmpr;
+  const mmprReports = mmprResponse?.reports;
+
+  // Work Instructions
+  if (mmpr?.work_instructions?.length > 0) {
+    sectionTitle(String(sectionNum), "Work Instruction in Regular Service");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "Name", "Item", "Contents"]],
+      body: mmpr.work_instructions.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.name ?? "", r.item ?? "", r.contents ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // Work Details
+  if (mmpr?.work_details?.length > 0) {
+    sectionTitle(String(sectionNum), "Work Details in Regular Service");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "Name", "Item", "Contents"]],
+      body: mmpr.work_details.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.name ?? "", r.item ?? "", r.contents ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // Major Repairs
+  if (mmpr?.major_repairs?.length > 0) {
+    sectionTitle(String(sectionNum), "Major Repair Works Record");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "Work Done By", "Checked By", "Details of Works Carried Out", "Remarks"]],
+      body: mmpr.major_repairs.map((r: any, i: number) => [String(i + 1), r.date ?? "", r.workDoneBy ?? "", r.checkedBy ?? "", r.details ?? "", r.remarks ?? ""]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // Call Back Records
+  if (mmpr?.call_back_records?.length > 0) {
+    sectionTitle(String(sectionNum), "Call Back Record");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Date", "PIC", "Checked By", "Received", "Arrived", "Completion", "Trouble Found", "Action Taken"]],
+      body: mmpr.call_back_records.map((r: any, i: number) => {
+        const fmtDt = (v: string) => { if (!v) return ""; const p = parseDateParts(v); return p ? `${String(p.day).padStart(2,"0")}/${String(p.month).padStart(2,"0")} ${String(p.hours).padStart(2,"0")}:${String(p.minutes).padStart(2,"0")}` : v; };
+        return [String(i + 1), r.date ?? "", r.pic ?? "", r.checkedBy ?? "", fmtDt(r.received), fmtDt(r.arrived), fmtDt(r.completion), r.troubleFound ?? "", r.actionTaken ?? ""];
+      }),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 7, cellPadding: 2 },
+      columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
+  }
+
+  // Service Visits (from maintenance reports for this equipment + year)
+  if (mmprReports && mmprReports.length > 0) {
+    sectionTitle(String(sectionNum), "Service Visits");
+    autoTable(doc, {
+      startY: y,
+      head: [["No.", "Report Code", "Date", "Technician", "Type", "Status", "Findings", "Work Performed"]],
+      body: mmprReports.map((r: any, i: number) => [
+        String(i + 1),
+        r.report_code ?? "",
+        r.arrival_date_time ? fmtDate(r.arrival_date_time) : "",
+        r.technician_name ?? "",
+        r.maintenance_type ?? "",
+        r.status ?? "",
+        r.findings ?? "",
+        r.work_performed ?? "",
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: GREEN, textColor: 255, fontSize: 8, fontStyle: "bold" },
+      styles: { fontSize: 7, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 22 },
+      },
+      margin: { left: mx, right: mx },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    sectionNum++;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -1041,7 +1092,7 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
     setMmprData(null);
     fetch(`${API_BASE}/mmpr/${detail.equipmentId}?year=${mmprYear}`, { headers: authHeaders })
       .then(r => r.json())
-      .then(d => { setMmprData(d); setMmprDraft({ break_armature_gap: d.mmpr.break_armature_gap ?? [], rope_investigation: d.mmpr.rope_investigation ?? [], work_instructions: d.mmpr.work_instructions ?? [], work_details: d.mmpr.work_details ?? [], major_repairs: d.mmpr.major_repairs ?? [], call_back_records: d.mmpr.call_back_records ?? [] }); })
+      .then(d => { setMmprData(d); setMmprDraft({ work_instructions: d.mmpr.work_instructions ?? [], work_details: d.mmpr.work_details ?? [], major_repairs: d.mmpr.major_repairs ?? [], call_back_records: d.mmpr.call_back_records ?? [] }); })
       .catch(console.error);
   }, [tab, detail?.equipmentId, mmprYear]);
 
@@ -1504,9 +1555,9 @@ function DetailModal({ code, onClose, onStatusChange, onToast, onDetailUpdated, 
                           <button onClick={() => removeMmprRow("call_back_records", i)} className="text-red-400 hover:text-red-600 text-xs justify-self-end">Remove</button>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                          <input className={editInputCls} placeholder="Received" value={row.received ?? ""} onChange={e => updateMmprRow("call_back_records", i, { received: e.target.value })} />
-                          <input className={editInputCls} placeholder="Arrived" value={row.arrived ?? ""} onChange={e => updateMmprRow("call_back_records", i, { arrived: e.target.value })} />
-                          <input className={editInputCls} placeholder="Completion" value={row.completion ?? ""} onChange={e => updateMmprRow("call_back_records", i, { completion: e.target.value })} />
+                          <input className={editInputCls} type="datetime-local" value={row.received ?? ""} onChange={e => updateMmprRow("call_back_records", i, { received: e.target.value })} title="Received" />
+                          <input className={editInputCls} type="datetime-local" value={row.arrived ?? ""} onChange={e => updateMmprRow("call_back_records", i, { arrived: e.target.value })} title="Arrived" />
+                          <input className={editInputCls} type="datetime-local" value={row.completion ?? ""} onChange={e => updateMmprRow("call_back_records", i, { completion: e.target.value })} title="Completion" />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <input className={editInputCls} placeholder="Trouble Found" value={row.troubleFound ?? ""} onChange={e => updateMmprRow("call_back_records", i, { troubleFound: e.target.value })} />
