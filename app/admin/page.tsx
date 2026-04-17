@@ -498,8 +498,22 @@ function downloadReportPdf(d: WorkOrderDetail, mmprResponse?: { mmpr: any; repor
   doc.save(`MMPR_${d.id ?? "unknown"}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-function fmtDate(iso: string) { if (!iso) return "-"; const d = new Date(iso); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; }
-function fmtTime(iso: string) { if (!iso) return "-"; const d = new Date(iso); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+// Parse datetime string directly without timezone conversion
+// Handles both "2026-04-17T14:30" (no TZ) and "2026-04-17T07:30:00.000Z" (UTC)
+function parseDateParts(iso: string) {
+  if (!iso) return null;
+  // If string has no Z/offset, parse directly to avoid timezone shift
+  if (!iso.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(iso)) {
+    const [datePart, timePart] = iso.split("T");
+    const [y, m, d] = (datePart ?? "").split("-").map(Number);
+    const [hh, mm] = (timePart ?? "00:00").split(":").map(Number);
+    return { year: y, month: m, day: d, hours: hh, minutes: mm };
+  }
+  const dt = new Date(iso);
+  return { year: dt.getFullYear(), month: dt.getMonth() + 1, day: dt.getDate(), hours: dt.getHours(), minutes: dt.getMinutes() };
+}
+function fmtDate(iso: string) { const p = parseDateParts(iso); if (!p) return "-"; return `${String(p.day).padStart(2,"0")}/${String(p.month).padStart(2,"0")}/${p.year}`; }
+function fmtTime(iso: string) { const p = parseDateParts(iso); if (!p) return "-"; return `${String(p.hours).padStart(2,"0")}:${String(p.minutes).padStart(2,"0")}`; }
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
 

@@ -822,7 +822,7 @@ export default function Home() {
         building_id: formData.building_id,
         equipmentId: formData.equipmentId,
         maintenance_type: formData.maintenance_type,
-        arrival_date_time: new Date(formData.arrival_date_time).toISOString(),
+        arrival_date_time: formData.arrival_date_time,
         technician_name: formData.technician_name,
         checklist_results,
         findings: `${checkedCount}/${totalCount} checklist items assessed`,
@@ -845,7 +845,7 @@ export default function Home() {
           dataUrl: photo.dataUrl,
         })),
         completion_date_time: formData.completionDate && formData.completionTime
-          ? new Date(`${formData.completionDate}T${formData.completionTime}`).toISOString()
+          ? `${formData.completionDate}T${formData.completionTime}`
           : undefined,
         customer_name: formData.customerName || undefined,
         customer_title: formData.customerTitle || undefined,
@@ -1334,56 +1334,120 @@ export default function Home() {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 5 && (() => {
+            const selectedBuilding = buildings.find((b) => b.id === formData.building_id);
+            const selectedEquipment = equipmentList.find((e) => e.id === formData.equipmentId);
+            const checklistGroups = dynamicChecklist ?? [];
+            const partsWithName = formData.parts.filter((p) => p.name.trim());
+            return (
             <div className="space-y-4">
+              {/* Step 1: Basic Information */}
               <section className="rounded-xl border-2 border-slate-200 bg-white p-4">
                 <h3 className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-[#1b3c7b]">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2h10v10H2z" stroke="currentColor" strokeWidth="1.2"/><path d="M5 1v2M9 1v2M2 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                  Basic Information
+                  Step 1 — Basic Information
                 </h3>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div><span className="text-slate-400 text-xs block">Building</span><span className="font-medium text-slate-800">{buildings.find((item) => item.id === formData.building_id)?.name || "-"}</span></div>
-                  <div><span className="text-slate-400 text-xs block">Equipment</span><span className="font-medium text-slate-800">{equipmentList.find((item) => item.id === formData.equipmentId)?.equipment_code || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Building</span><span className="font-medium text-slate-800">{selectedBuilding?.name || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Equipment Type</span><span className="font-medium text-slate-800">{formData.equipment_type || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Lift No.</span><span className="font-medium text-slate-800">{selectedEquipment?.equipment_code || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Maintenance Type</span><span className="font-medium text-slate-800">{formData.maintenance_type || "-"}</span></div>
                   <div><span className="text-slate-400 text-xs block">Service Date</span><span className="font-medium text-slate-800">{arrivalDate || "-"}</span></div>
                   <div><span className="text-slate-400 text-xs block">Arrival Time</span><span className="font-medium text-slate-800">{arrivalTime || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Technician</span><span className="font-medium text-slate-800">{formData.technician_name || "-"}</span></div>
                 </dl>
               </section>
 
+              {/* Step 2: Checklist Results */}
               <section className="rounded-xl border-2 border-slate-200 bg-white p-4">
                 <h3 className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-[#1b3c7b]">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Service Summary
+                  Step 2 — Checklist ({checkedCount}/{totalCount} assessed)
                 </h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div><span className="text-slate-400 text-xs block">Checklist</span><span className="font-medium text-slate-800">{checkedCount}/{totalCount} assessed</span></div>
-                  <div><span className="text-slate-400 text-xs block">Parts</span><span className="font-medium text-slate-800">{formData.partsReplaced === "no-change" ? "No Change" : formData.partsReplaced === "replaced" ? "Yes (Replaced)" : "Needs Replacement"}</span></div>
-                  <div><span className="text-slate-400 text-xs block">Photos</span><span className="font-medium text-slate-800">{formData.photos.length} uploaded</span></div>
-                  <div><span className="text-slate-400 text-xs block">Issues</span><span className="font-medium text-slate-800 line-clamp-1">{formData.issuesFound || "None reported"}</span></div>
+                <div className="space-y-2">
+                  {checklistGroups.map((group, gi) => (
+                    <div key={gi}>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">{group.category}</p>
+                      <ul className="space-y-0.5">
+                        {group.items.map((item, ii) => {
+                          const statuses = formData.checklistState[`${gi}-${ii}`] ?? [];
+                          return (
+                            <li key={ii} className="flex items-center gap-2 text-xs text-slate-700">
+                              <span>{statuses.length > 0 ? "\u2705" : "\u2B1C"}</span>
+                              <span className="flex-1">{typeof item === "string" ? item : (item as any).label ?? item}</span>
+                              {statuses.length > 0 && (
+                                <span className="flex gap-1">
+                                  {statuses.map((s: string, si: number) => (
+                                    <span key={si} className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                      s === "good" ? "bg-green-100 text-green-700" :
+                                      s === "adjusted" ? "bg-blue-100 text-blue-700" :
+                                      s === "repair" ? "bg-red-100 text-red-700" :
+                                      "bg-gray-100 text-gray-500"
+                                    }`}>{s === "good" ? "Good" : s === "adjusted" ? "Adjusted" : s === "repair" ? "Repair" : "N/A"}</span>
+                                  ))}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
-                <div>Customer: {formData.customerName || "-"}</div>
-                <div>Initial Ticket Status: PC Review</div>
               </section>
 
-              {formData.photos.length > 0 && (
-                <section className="rounded-xl border-2 border-slate-300 bg-white p-4 text-sm">
-                  <h3 className="mb-3 border-b-2 border-slate-200 pb-2 text-sm font-bold text-[#1b3c7b]">
-                    Photo Evidence
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {/* Step 3: Photos & Notes */}
+              <section className="rounded-xl border-2 border-slate-200 bg-white p-4">
+                <h3 className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><circle cx="4.5" cy="5.5" r="1.2" stroke="currentColor" strokeWidth="1"/><path d="M1 10l3-3 2 2 3-3 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Step 3 — Photos & Notes
+                </h3>
+                {formData.photos.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 mb-3">
                     {formData.photos.map((photo, idx) => (
                       <figure key={`${photo.name}-${idx}`} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                        <img src={photo.url} alt={photo.name} className="h-24 w-full object-cover" />
-                        <figcaption className="truncate px-2 py-1 text-[11px] text-slate-600" title={photo.name}>
-                          {photo.name}
-                        </figcaption>
+                        <img src={photo.url} alt={photo.name} className="h-20 w-full object-cover" />
+                        <figcaption className="truncate px-2 py-1 text-[10px] text-slate-500" title={photo.name}>{photo.name}</figcaption>
                       </figure>
                     ))}
                   </div>
-                </section>
-              )}
+                ) : (
+                  <p className="text-xs text-slate-400 mb-3">No photos uploaded</p>
+                )}
+                <dl className="grid grid-cols-1 gap-y-2 text-sm">
+                  <div><span className="text-slate-400 text-xs block">Additional Notes</span><span className="font-medium text-slate-800">{formData.additionalNotes || "-"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Customer Message</span><span className="font-medium text-slate-800">{formData.customerMessage || "-"}</span></div>
+                </dl>
+              </section>
+
+              {/* Step 4: Issues & Parts */}
+              <section className="rounded-xl border-2 border-slate-200 bg-white p-4">
+                <h3 className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-[#1b3c7b]">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  Step 4 — Issues & Parts
+                </h3>
+                <dl className="grid grid-cols-1 gap-y-2 text-sm">
+                  <div><span className="text-slate-400 text-xs block">Issues Found</span><span className="font-medium text-slate-800">{formData.issuesFound || "None reported"}</span></div>
+                  <div><span className="text-slate-400 text-xs block">Parts Replaced</span><span className="font-medium text-slate-800">{formData.partsReplaced === "no-change" ? "No Change" : formData.partsReplaced === "replaced" ? "Yes (Replaced)" : "Needs Replacement"}</span></div>
+                  {partsWithName.length > 0 && (
+                    <div>
+                      <span className="text-slate-400 text-xs block mb-1">Parts List</span>
+                      <ul className="space-y-1">
+                        {partsWithName.map((p, i) => (
+                          <li key={i} className="text-xs text-slate-700 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                            {p.name} x {p.quantity}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </dl>
+              </section>
 
             </div>
-          )}
+            );
+          })()}
 
           {step === 6 && (
             <div className="space-y-5">
