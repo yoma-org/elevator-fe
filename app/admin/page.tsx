@@ -1719,8 +1719,8 @@ function AdminDashboardInner() {
     <>
       <style>{ANIM_STYLES}</style>
 
-      {/* Sticky filter bar */}
-      <div className="bg-white rounded-xl border border-gray-200 mb-4 sticky top-3 z-10 shadow-sm overflow-hidden">
+      {/* Sticky filter bar — sits below the 56px AdminHeader */}
+      <div className="bg-white rounded-xl border border-gray-200 mb-4 sticky top-[60px] z-20 shadow-sm overflow-hidden">
         {/* Row 1: Date range + Status + Actions */}
         <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-gray-100">
           <div className="flex items-center gap-2 text-sm text-gray-700">
