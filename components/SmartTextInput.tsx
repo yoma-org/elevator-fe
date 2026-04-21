@@ -28,6 +28,23 @@ export default function SmartTextInput({
 }: SmartTextInputProps) {
   const [ghostText, setGhostText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent | TouchEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("touchstart", onClick);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("touchstart", onClick);
+    };
+  }, []);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -58,20 +75,17 @@ export default function SmartTextInput({
           signal: controller.signal,
         });
         const json = await res.json();
-        const suggestions: string[] = json?.data ?? [];
+        const list: string[] = json?.data ?? [];
+        setSuggestions(list);
 
         // Find the best match: a suggestion that starts with user's input
         const lowerQuery = query.toLowerCase();
-        const match = suggestions.find((s) =>
+        const match = list.find((s) =>
           s.toLowerCase().startsWith(lowerQuery),
         );
 
         if (match) {
-          // Ghost = the part the user hasn't typed yet
           setGhostText(match.slice(query.length));
-        } else if (suggestions.length > 0) {
-          // No prefix match — show first suggestion fully as ghost
-          setGhostText(suggestions[0]);
         } else {
           setGhostText("");
         }
@@ -94,6 +108,7 @@ export default function SmartTextInput({
     const trimmed = newValue.trim();
     if (trimmed.length < 2) {
       setGhostText("");
+      setSuggestions([]);
       return;
     }
 
@@ -129,15 +144,24 @@ export default function SmartTextInput({
     };
   }, []);
 
-  // Clear ghost when value is cleared externally
+  // Clear ghost + suggestions when value is cleared externally
   useEffect(() => {
-    if (!value) setGhostText("");
+    if (!value) { setGhostText(""); setSuggestions([]); }
   }, [value]);
+
+  const pickSuggestion = (text: string) => {
+    onChange(text);
+    setGhostText("");
+    setSuggestions([]);
+    // Keep isFocused so next typing can trigger suggestions again
+  };
 
   const showGhost = isFocused && ghostText.length > 0;
 
+  const showDropdown = isFocused && suggestions.length > 0;
+
   return (
-    <div className="relative">
+    <div ref={wrapRef} className="relative">
       {/* Ghost text overlay — sits behind the textarea */}
       <div
         ref={ghostRef}
@@ -210,6 +234,40 @@ export default function SmartTextInput({
           <span className="sm:hidden">Accept ✓</span>
           <span className="hidden sm:inline">Tab ↹</span>
         </button>
+      )}
+
+      {/* Suggestions dropdown */}
+      {showDropdown && (
+        <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white rounded-xl border-2 border-slate-200 shadow-xl max-h-60 overflow-y-auto">
+          <li className="sticky top-0 bg-slate-50 border-b border-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Previously used ({suggestions.length})
+          </li>
+          {suggestions.map((s, i) => {
+            const lowerQ = value.trim().toLowerCase();
+            const idx = s.toLowerCase().indexOf(lowerQ);
+            return (
+              <li key={i}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); pickSuggestion(s); }}
+                  onTouchEnd={(e) => { e.preventDefault(); pickSuggestion(s); }}
+                  className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 active:bg-slate-100 flex items-center gap-2 min-h-[40px]"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-slate-300 flex-shrink-0"><path d="M6 1.5v4l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/></svg>
+                  <span className="truncate">
+                    {idx >= 0 && lowerQ ? (
+                      <>
+                        {s.slice(0, idx)}
+                        <span className="font-semibold text-slate-900 bg-yellow-100">{s.slice(idx, idx + lowerQ.length)}</span>
+                        {s.slice(idx + lowerQ.length)}
+                      </>
+                    ) : s}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
