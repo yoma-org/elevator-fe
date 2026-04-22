@@ -297,6 +297,18 @@ export default function Home() {
   // All equipment in the selected building (used to derive types + filter codes)
   const [allBuildingEquipment, setAllBuildingEquipment] = useState<Equipment[]>([]);
 
+  // Previously used part names (fetched once for part-name picker)
+  const [knownPartNames, setKnownPartNames] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/suggestions?field=parts&q=&limit=500`);
+        const json = await res.json();
+        setKnownPartNames(json?.data ?? []);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
   useEffect(() => {
     const initLookups = async () => {
       try {
@@ -1290,14 +1302,13 @@ export default function Home() {
                   {formData.parts.map((part, index) => (
                     <div key={`part-${index}`} className="grid grid-cols-5 gap-2">
                       <div className="col-span-3">
-                        <SmartTextInput
-                          className="form-input w-full h-11 rounded-xl border-2 border-slate-300 px-3 text-sm shadow-sm transition-all"
-                          placeholder="Part name"
+                        <Combobox
+                          options={knownPartNames.map((n) => ({ value: n, label: n }))}
                           value={part.name}
                           onChange={(v) => updatePart(index, "name", v)}
-                          field="parts"
-                          multiline={false}
-                          minHeight="44px"
+                          placeholder="Select or type a new part name..."
+                          allowCreate
+                          createLabel="Use"
                         />
                       </div>
                       <input

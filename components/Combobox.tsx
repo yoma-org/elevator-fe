@@ -16,6 +16,10 @@ interface ComboboxProps {
   disabledMessage?: string;
   error?: boolean;
   className?: string;
+  /** If true, allow picking values that aren't in the list (free text entry) */
+  allowCreate?: boolean;
+  /** Label prefix for the "create new" option, e.g. "Use" → "Use 'xyz' as new" */
+  createLabel?: string;
 }
 
 function isTouchDevice(): boolean {
@@ -32,6 +36,8 @@ export function Combobox({
   disabledMessage,
   error = false,
   className = "",
+  allowCreate = false,
+  createLabel = "Use",
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -138,26 +144,38 @@ export function Combobox({
         </div>
       )}
       <div className={isMobile ? "overflow-y-auto" : "max-h-64 overflow-y-auto overscroll-contain"} style={isMobile ? { maxHeight: "calc(70vh - 120px)" } : undefined}>
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && !(allowCreate && query.trim()) ? (
           <div className="px-4 py-8 text-center text-sm text-slate-400">No matches</div>
         ) : (
-          filtered.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => { onChange(opt.value); setOpen(false); }}
-              className={`w-full text-left px-4 py-3 text-base hover:bg-slate-50 active:bg-slate-100 transition-colors flex items-center gap-2 min-h-[44px] ${
-                opt.value === value ? "bg-blue-50 text-[#1b3c7b] font-semibold" : "text-slate-700"
-              }`}
-            >
-              {opt.value === value ? (
-                <svg width="14" height="14" viewBox="0 0 12 12" fill="none" className="flex-shrink-0"><path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              ) : (
-                <span className="w-[14px] flex-shrink-0" />
-              )}
-              <span className="truncate">{opt.label}</span>
-            </button>
-          ))
+          <>
+            {filtered.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`w-full text-left px-4 py-3 text-base hover:bg-slate-50 active:bg-slate-100 transition-colors flex items-center gap-2 min-h-[44px] ${
+                  opt.value === value ? "bg-blue-50 text-[#1b3c7b] font-semibold" : "text-slate-700"
+                }`}
+              >
+                {opt.value === value ? (
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" className="flex-shrink-0"><path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ) : (
+                  <span className="w-[14px] flex-shrink-0" />
+                )}
+                <span className="truncate">{opt.label}</span>
+              </button>
+            ))}
+            {allowCreate && query.trim() && !filtered.some(o => o.label.toLowerCase() === query.trim().toLowerCase()) && (
+              <button
+                type="button"
+                onClick={() => { onChange(query.trim()); setOpen(false); }}
+                className="w-full text-left px-4 py-3 text-base hover:bg-green-50 active:bg-green-100 transition-colors flex items-center gap-2 min-h-[44px] text-green-700 border-t border-slate-100"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                <span className="truncate"><span className="text-slate-500 font-normal">{createLabel}</span> &ldquo;{query.trim()}&rdquo;</span>
+              </button>
+            )}
+          </>
         )}
       </div>
       {filtered.length > 0 && options.length > 10 && !isMobile && (
@@ -176,8 +194,8 @@ export function Combobox({
         onClick={() => setOpen((v) => !v)}
         className={baseCls}
       >
-        <span className={`truncate text-left ${!selected ? "text-slate-400 font-normal" : "font-medium"}`}>
-          {disabled ? (disabledMessage ?? placeholder) : selected ? selected.label : placeholder}
+        <span className={`truncate text-left ${!selected && !(allowCreate && value) ? "text-slate-400 font-normal" : "font-medium"}`}>
+          {disabled ? (disabledMessage ?? placeholder) : selected ? selected.label : (allowCreate && value) ? value : placeholder}
         </span>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={`flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
