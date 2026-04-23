@@ -22,9 +22,15 @@ const NAV_ITEMS = [
     items: [
       {
         label: "Equipment",
-        href: "/admin/management",
+        href: "/admin/equipment",
         desc: "Equipment maintenance overview",
         icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M2 7h16M6 3v4M14 3v4M6 11h2M6 14h2M10 11h2M10 14h2M14 11h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+      },
+      {
+        label: "Management",
+        href: "/admin/management",
+        desc: "Maintenance schedule",
+        icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 4h14M3 10h14M3 16h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="5" cy="4" r="1.2" fill="currentColor"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="13" cy="16" r="1.2" fill="currentColor"/></svg>,
       },
       {
         label: "Roster Upload",

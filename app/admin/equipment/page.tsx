@@ -4,75 +4,66 @@ import { useEffect, useState, useRef } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
-interface ScheduleRow {
-  date: string;
-  equipment_type: string;
+interface Row {
+  building_id: string;
+  building_name: string;
+  team: string | null;
+  equipment_id: string;
   equipment_code: string;
-  maintenance_type: string;
-  frequency: string;
-  technician_name: string;
-  status: string;
+  equipment_type: string;
+  equipment_category: string | null;
+  maintenance_count: number;
+  first_maintenance: string | null;
+  last_maintenance: string | null;
 }
 
-interface ScheduleResponse {
-  data: ScheduleRow[];
+interface Response {
+  data: Row[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
   filters: {
+    buildings: Array<{ id: string; name: string }>;
     equipmentTypes: string[];
-    statuses: string[];
   };
 }
 
-type SortField = keyof ScheduleRow;
+type SortField = keyof Row;
 type SortDir = "asc" | "desc";
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  received:       { bg: "#fef9c3", text: "#713f12" },
-  "pc-review":    { bg: "#dbeafe", text: "#1e40af" },
-  "comm-review":  { bg: "#ede9fe", text: "#5b21b6" },
-  "invoice-ready":{ bg: "#cffafe", text: "#155e75" },
-  closed:         { bg: "#d1fae5", text: "#065f46" },
-  pending:        { bg: "#dbeafe", text: "#1e40af" },
-  "in-progress":  { bg: "#dbeafe", text: "#1e40af" },
-  active:         { bg: "#dbeafe", text: "#1e40af" },
-};
-
-function statusLabel(s: string) {
-  const lower = s.toLowerCase();
-  const labels: Record<string, string> = {
-    received: "CBS Received", "pc-review": "PC Review", "comm-review": "Comm. Review",
-    "invoice-ready": "Invoice Ready", closed: "Closed", pending: "PC Review",
-    "in-progress": "PC Review", active: "PC Review",
-  };
-  return labels[lower] ?? s;
-}
-
 const COLUMNS: { key: SortField; label: string }[] = [
-  { key: "date", label: "Date" },
-  { key: "equipment_type", label: "List of Equipment" },
-  { key: "equipment_code", label: "Serial No." },
-  { key: "maintenance_type", label: "Parts in Scope" },
-  { key: "frequency", label: "Frequency" },
-  { key: "technician_name", label: "Service Engineer" },
-  { key: "status", label: "Status" },
+  { key: "building_name", label: "Building" },
+  { key: "team", label: "Team" },
+  { key: "equipment_code", label: "Lift No." },
+  { key: "equipment_type", label: "Equipment Type" },
+  { key: "equipment_category", label: "Category" },
+  { key: "maintenance_count", label: "Visits" },
+  { key: "first_maintenance", label: "First Maintenance" },
+  { key: "last_maintenance", label: "Last Maintenance" },
 ];
 
-export default function ManagementPage() {
-  const [rows, setRows] = useState<ScheduleRow[]>([]);
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [datePart] = iso.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${String(d).padStart(2, "0")} ${months[m - 1]} ${y}`;
+}
+
+export default function EquipmentPage() {
+  const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [buildings, setBuildings] = useState<Array<{ id: string; name: string }>>([]);
   const [equipmentTypes, setEquipmentTypes] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterBuilding, setFilterBuilding] = useState("");
   const [filterEquipment, setFilterEquipment] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortField, setSortField] = useState<SortField>("building_name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -97,25 +88,25 @@ export default function ManagementPage() {
     params.set("sortDir", sortDir);
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (filterEquipment) params.set("equipmentType", filterEquipment);
-    if (filterStatus) params.set("status", filterStatus);
+    if (filterBuilding) params.set("buildingId", filterBuilding);
 
-    fetch(`${API_BASE}/maintenance-reports/admin/management-schedule?${params}`, {
+    fetch(`${API_BASE}/maintenance-reports/admin/equipment-summary?${params}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(r => r.json())
-      .then((d: ScheduleResponse) => {
+      .then((d: Response) => {
         if (reqId !== reqIdRef.current) return;
         setRows(d.data ?? []);
         setTotal(d.total ?? 0);
         setTotalPages(d.totalPages ?? 1);
+        setBuildings(d.filters?.buildings ?? []);
         setEquipmentTypes(d.filters?.equipmentTypes ?? []);
-        setStatuses(d.filters?.statuses ?? []);
         setLoading(false);
       })
       .catch(() => { if (reqId === reqIdRef.current) setLoading(false); });
-  }, [token, currentPage, pageSize, sortField, sortDir, debouncedSearch, filterEquipment, filterStatus]);
+  }, [token, currentPage, pageSize, sortField, sortDir, debouncedSearch, filterEquipment, filterBuilding]);
 
-  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, filterEquipment, filterStatus, pageSize]);
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, filterEquipment, filterBuilding, pageSize]);
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -132,8 +123,8 @@ export default function ManagementPage() {
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-800">Maintenance Schedule</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Overview of all maintenance activities and service frequency</p>
+        <h1 className="text-xl font-bold text-gray-800">Equipment Maintenance Overview</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Equipment per building that has at least one maintenance record</p>
       </div>
 
       {/* Filters */}
@@ -142,21 +133,21 @@ export default function ManagementPage() {
           <div className="flex-1 min-w-[200px]">
             <input
               type="text"
-              placeholder="Search equipment, technician, type..."
+              placeholder="Search building, lift, equipment type, team..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100"
             />
           </div>
+          <select value={filterBuilding} onChange={e => setFilterBuilding(e.target.value)} className={selectCls}>
+            <option value="">All Buildings</option>
+            {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
           <select value={filterEquipment} onChange={e => setFilterEquipment(e.target.value)} className={selectCls}>
-            <option value="">All Equipment</option>
+            <option value="">All Equipment Types</option>
             {equipmentTypes.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectCls}>
-            <option value="">All Status</option>
-            {statuses.map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
-          </select>
-          <span className="text-xs text-gray-400 font-medium">{total} records</span>
+          <span className="text-xs text-gray-400 font-medium">{total} equipment</span>
         </div>
       </div>
 
@@ -170,7 +161,7 @@ export default function ManagementPage() {
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    className="text-left text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 cursor-pointer select-none hover:bg-white/10 transition-colors"
+                    className="text-left text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 cursor-pointer select-none hover:bg-white/10 transition-colors whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1.5">
                       {col.label}
@@ -191,40 +182,38 @@ export default function ManagementPage() {
               {loading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: COLUMNS.length }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
-                        <div className="h-4 rounded bg-gray-100" style={{ width: `${50 + j * 10}%`, animation: "shimmer 1.4s infinite linear", background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "400px 100%" }} />
+                        <div className="h-4 rounded bg-gray-100" style={{ width: `${50 + j * 8}%`, animation: "shimmer 1.4s infinite linear", background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "400px 100%" }} />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">No records found</td>
+                  <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
                 </tr>
               ) : (
-                rows.map((row, i) => {
-                  const sc = STATUS_COLORS[row.status.toLowerCase()] ?? { bg: "#f3f4f6", text: "#374151" };
-                  return (
-                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors" style={i % 2 === 0 ? { backgroundColor: "#f0f9ff08" } : {}}>
-                      <td className="px-4 py-3 text-gray-700 text-xs font-medium whitespace-nowrap">{row.date}</td>
-                      <td className="px-4 py-3 text-gray-800 text-xs font-semibold">{row.equipment_type}</td>
-                      <td className="px-4 py-3 text-gray-700 text-xs font-mono">{row.equipment_code}</td>
-                      <td className="px-4 py-3 text-gray-700 text-xs">{row.maintenance_type}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                          {row.frequency}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 text-xs">{row.technician_name}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: sc.bg, color: sc.text }}>
-                          {statusLabel(row.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
+                rows.map((row) => (
+                  <tr key={row.equipment_id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-gray-800 text-xs font-semibold">{row.building_name}</td>
+                    <td className="px-4 py-3">
+                      {row.team ? (
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-bold">{row.team}</span>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 text-xs font-mono">{row.equipment_code}</td>
+                    <td className="px-4 py-3 text-gray-700 text-xs">{row.equipment_type}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{row.equipment_category ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        {row.maintenance_count}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{fmtDate(row.first_maintenance)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{fmtDate(row.last_maintenance)}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
