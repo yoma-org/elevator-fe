@@ -16,9 +16,26 @@ export interface YearlyMatrixResponse {
     category: string;
     items: Array<{ label: string; statuses: Record<string, string> }>;
   }>;
+  stats: {
+    totalVisits: number;
+    firstVisit: string | null;
+    lastVisit: string | null;
+  };
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [datePart] = iso.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  return `${String(d).padStart(2, "0")} ${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+function fmtPeriod(r: { startYear: number; startMonth: number; endYear: number; endMonth: number }): string {
+  return `${MONTH_NAMES[r.startMonth - 1]} ${r.startYear} – ${MONTH_NAMES[r.endMonth - 1]} ${r.endYear}`;
+}
 
 export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -49,8 +66,49 @@ export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
 
   doc.setTextColor(30, 30, 30);
 
-  // ── Legend ──
+  // ── General Information ──
   let y = 22;
+  const genInfoLabelStyles = {
+    fontStyle: "bold" as const,
+    fillColor: LIGHT_GREEN,
+    textColor: GRAY,
+    cellWidth: 26,
+  };
+  autoTable(doc, {
+    startY: y,
+    body: [
+      [
+        { content: "Building", styles: genInfoLabelStyles },
+        data.equipment.building_name || "—",
+        { content: "Lift No.", styles: genInfoLabelStyles },
+        data.equipment.code || "—",
+        { content: "Team", styles: genInfoLabelStyles },
+        data.equipment.team ?? "—",
+      ],
+      [
+        { content: "Equipment Type", styles: genInfoLabelStyles },
+        data.equipment.type || "—",
+        { content: "Category", styles: genInfoLabelStyles },
+        data.equipment.category ?? "—",
+        { content: "Period", styles: genInfoLabelStyles },
+        fmtPeriod(data.range),
+      ],
+      [
+        { content: "Total Visits", styles: genInfoLabelStyles },
+        String(data.stats.totalVisits),
+        { content: "First Visit", styles: genInfoLabelStyles },
+        fmtDate(data.stats.firstVisit),
+        { content: "Last Visit", styles: genInfoLabelStyles },
+        fmtDate(data.stats.lastVisit),
+      ],
+    ],
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 2.5, lineColor: [200, 200, 200], lineWidth: 0.1 },
+    margin: { left: mx, right: mx },
+  });
+  y = (doc as any).lastAutoTable.finalY + 5;
+
+  // ── Legend ──
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.text("Legend:", mx, y);
