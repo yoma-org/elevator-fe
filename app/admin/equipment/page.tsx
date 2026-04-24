@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { downloadYearlyMmprPdf, type YearlyMatrixResponse } from "../../../lib/pdf/yearlyMmpr";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
@@ -118,6 +119,36 @@ export default function EquipmentPage() {
     setCurrentPage(1);
   }
 
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  async function handleGenerateMmpr(row: Row) {
+    if (generatingId) return;
+    setGeneratingId(row.equipment_id);
+    try {
+      const now = new Date();
+      const endYear = now.getFullYear();
+      const endMonth = now.getMonth() + 1;
+      const startYear = endYear - 1;
+      const startMonth = 1;
+      const params = new URLSearchParams({
+        startYear: String(startYear),
+        startMonth: String(startMonth),
+        endYear: String(endYear),
+        endMonth: String(endMonth),
+      });
+      const res = await fetch(`${API_BASE}/mmpr/yearly-matrix/${row.equipment_id}?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) { alert("Failed to fetch MMPR data"); return; }
+      const data = (await res.json()) as YearlyMatrixResponse;
+      downloadYearlyMmprPdf(data);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate MMPR PDF");
+    } finally {
+      setGeneratingId(null);
+    }
+  }
+
   const selectCls = "text-xs border border-gray-300 rounded-lg px-2.5 py-2 bg-white outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100";
 
   return (
@@ -176,13 +207,14 @@ export default function EquipmentPage() {
                     </div>
                   </th>
                 ))}
+                <th className="text-center text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 whitespace-nowrap">MMPR</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    {Array.from({ length: COLUMNS.length }).map((_, j) => (
+                    {Array.from({ length: COLUMNS.length + 1 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 rounded bg-gray-100" style={{ width: `${50 + j * 8}%`, animation: "shimmer 1.4s infinite linear", background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "400px 100%" }} />
                       </td>
@@ -191,7 +223,7 @@ export default function EquipmentPage() {
                 ))
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
+                  <td colSpan={COLUMNS.length + 1} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
                 </tr>
               ) : (
                 rows.map((row) => (
@@ -212,6 +244,17 @@ export default function EquipmentPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{fmtDate(row.first_maintenance)}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{fmtDate(row.last_maintenance)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleGenerateMmpr(row)}
+                        disabled={generatingId === row.equipment_id}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                        title="Generate Yearly MMPR PDF"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                        {generatingId === row.equipment_id ? "..." : "Generate"}
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
