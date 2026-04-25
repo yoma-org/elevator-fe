@@ -37,6 +37,14 @@ function fmtPeriod(r: { startYear: number; startMonth: number; endYear: number; 
   return `${MONTH_NAMES[r.startMonth - 1]} ${r.startYear} – ${MONTH_NAMES[r.endMonth - 1]} ${r.endYear}`;
 }
 
+/** Inclusive month span between first and last maintenance dates. */
+function monthsBetween(firstIso: string | null, lastIso: string | null): number {
+  if (!firstIso || !lastIso) return 0;
+  const [fy, fm] = firstIso.split("T")[0].split("-").map(Number);
+  const [ly, lm] = lastIso.split("T")[0].split("-").map(Number);
+  return (ly - fy) * 12 + (lm - fm) + 1;
+}
+
 export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -95,7 +103,7 @@ export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
       ],
       [
         { content: "Total Month", styles: genInfoLabelStyles },
-        String(data.stats.totalVisits),
+        String(monthsBetween(data.stats.firstVisit, data.stats.lastVisit)),
         { content: "First Maintenance", styles: genInfoLabelStyles },
         fmtDate(data.stats.firstVisit),
         { content: "Latest Maintenance", styles: genInfoLabelStyles },
