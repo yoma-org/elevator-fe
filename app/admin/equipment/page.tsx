@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { downloadYearlyMmprPdf, type YearlyMatrixResponse } from "../../../lib/pdf/yearlyMmpr";
+import { useAdminSession } from "../../../lib/admin-session-context";
+import AddHistoryModal from "../../../components/AddHistoryModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
@@ -38,7 +40,6 @@ const COLUMNS: { key: SortField; label: string }[] = [
   { key: "team", label: "Team" },
   { key: "equipment_code", label: "Lift No." },
   { key: "equipment_type", label: "Equipment Type" },
-  { key: "equipment_category", label: "Category" },
   { key: "maintenance_count", label: "Visits" },
   { key: "first_maintenance", label: "First Maintenance" },
   { key: "last_maintenance", label: "Last Maintenance" },
@@ -73,6 +74,13 @@ export default function EquipmentPage() {
     ? document.cookie.split("; ").find(c => c.startsWith("yecl-admin-session="))?.split("=")[1] ?? ""
     : "";
 
+  const { role } = useAdminSession();
+  const effectiveRole = role ?? "operation";
+  const canAddHistory = effectiveRole === "operation";
+
+  const [historyRow, setHistoryRow] = useState<Row | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
@@ -105,7 +113,7 @@ export default function EquipmentPage() {
         setLoading(false);
       })
       .catch(() => { if (reqId === reqIdRef.current) setLoading(false); });
-  }, [token, currentPage, pageSize, sortField, sortDir, debouncedSearch, filterEquipment, filterBuilding]);
+  }, [token, currentPage, pageSize, sortField, sortDir, debouncedSearch, filterEquipment, filterBuilding, refreshTick]);
 
   useEffect(() => { setCurrentPage(1); }, [debouncedSearch, filterEquipment, filterBuilding, pageSize]);
 
@@ -207,6 +215,7 @@ export default function EquipmentPage() {
                     </div>
                   </th>
                 ))}
+                <th className="text-center text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 whitespace-nowrap">History</th>
                 <th className="text-center text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 whitespace-nowrap">MMPR</th>
               </tr>
             </thead>
@@ -214,7 +223,7 @@ export default function EquipmentPage() {
               {loading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    {Array.from({ length: COLUMNS.length + 1 }).map((_, j) => (
+                    {Array.from({ length: COLUMNS.length + 2 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 rounded bg-gray-100" style={{ width: `${50 + j * 8}%`, animation: "shimmer 1.4s infinite linear", background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "400px 100%" }} />
                       </td>
@@ -223,7 +232,7 @@ export default function EquipmentPage() {
                 ))
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLUMNS.length + 1} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
+                  <td colSpan={COLUMNS.length + 2} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
                 </tr>
               ) : (
                 rows.map((row) => (
@@ -236,7 +245,6 @@ export default function EquipmentPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-700 text-xs font-mono">{row.equipment_code}</td>
                     <td className="px-4 py-3 text-gray-700 text-xs">{row.equipment_type}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{row.equipment_category ?? "—"}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                         {row.maintenance_count}
@@ -244,6 +252,19 @@ export default function EquipmentPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{fmtDate(row.first_maintenance)}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{fmtDate(row.last_maintenance)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => setHistoryRow(row)}
+                        disabled={!canAddHistory}
+                        title={canAddHistory ? "Add history record" : "Only Operation role can add history"}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-green-50 hover:border-green-400 hover:text-green-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                          <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                        Add
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => handleGenerateMmpr(row)}
@@ -311,6 +332,18 @@ export default function EquipmentPage() {
           </div>
         )}
       </div>
+
+      {historyRow && (
+        <AddHistoryModal
+          row={historyRow}
+          token={token}
+          onClose={() => setHistoryRow(null)}
+          onSaved={(msg) => {
+            console.log(msg);
+            setRefreshTick((t) => t + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

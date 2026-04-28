@@ -37,12 +37,17 @@ function fmtPeriod(r: { startYear: number; startMonth: number; endYear: number; 
   return `${MONTH_NAMES[r.startMonth - 1]} ${r.startYear} – ${MONTH_NAMES[r.endMonth - 1]} ${r.endYear}`;
 }
 
-/** Inclusive month span between first and last maintenance dates. */
-function monthsBetween(firstIso: string | null, lastIso: string | null): number {
-  if (!firstIso || !lastIso) return 0;
-  const [fy, fm] = firstIso.split("T")[0].split("-").map(Number);
-  const [ly, lm] = lastIso.split("T")[0].split("-").map(Number);
-  return (ly - fy) * 12 + (lm - fm) + 1;
+/** Count distinct months that have at least one item with a non-empty checklist status. */
+function monthsWithChecklist(data: YearlyMatrixResponse): number {
+  const months = new Set<string>();
+  for (const cat of data.categories ?? []) {
+    for (const item of cat.items ?? []) {
+      for (const [monthKey, sym] of Object.entries(item.statuses ?? {})) {
+        if (sym && sym.trim() !== "") months.add(monthKey);
+      }
+    }
+  }
+  return months.size;
 }
 
 export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
@@ -103,7 +108,7 @@ export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
       ],
       [
         { content: "Total Month", styles: genInfoLabelStyles },
-        String(monthsBetween(data.stats.firstVisit, data.stats.lastVisit)),
+        String(monthsWithChecklist(data)),
         { content: "First Maintenance", styles: genInfoLabelStyles },
         fmtDate(data.stats.firstVisit),
         { content: "Latest Maintenance", styles: genInfoLabelStyles },
