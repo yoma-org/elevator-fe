@@ -1775,7 +1775,7 @@ function AdminDashboardInner() {
                 Batch Upload
               </button>
             )}
-            {can(effectiveRole, "received", "approve") && (
+            {(effectiveRole === "operation" || effectiveRole === "commercial") && (
               <button onClick={() => setShowCreateProject(true)} className="btn-green text-xs font-semibold px-4 py-2 rounded-lg text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                 Add Project
@@ -1876,7 +1876,7 @@ function AdminDashboardInner() {
           </div>
           <p className="text-gray-500 font-medium">{orders.length === 0 ? "No work orders found" : "No results match your filters"}</p>
           <p className="text-gray-400 text-sm mt-1">{orders.length === 0 ? "Create a new CBS Call to get started." : "Try adjusting or clearing your filters."}</p>
-          {orders.length === 0 && (
+          {orders.length === 0 && (effectiveRole === "operation" || effectiveRole === "commercial") && (
             <button onClick={() => setShowCreateProject(true)} className="btn-green mt-4 text-sm font-semibold px-5 py-2.5 rounded-lg text-white inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all" style={{ backgroundColor: "#1a7a4a" }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
               Add Project
