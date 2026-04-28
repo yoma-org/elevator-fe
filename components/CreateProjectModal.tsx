@@ -174,7 +174,6 @@ export default function CreateProjectModal({ onClose, onCreated, token }: Props)
               allowCreate
               createLabel="Use"
             />
-            <p className="text-[11px] text-gray-400 mt-1">Tip: chọn nhiều team bằng cách mở dropdown lại lần nữa</p>
           </div>
 
           {/* Equipment Type */}
