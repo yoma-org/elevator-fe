@@ -50,7 +50,7 @@ function monthsWithChecklist(data: YearlyMatrixResponse): number {
   return months.size;
 }
 
-export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
+function buildYearlyMmprDoc(data: YearlyMatrixResponse): jsPDF {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -234,6 +234,37 @@ export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
     doc.text(`Page ${i} / ${pageCount}`, pageW - mx, pageH - 6, { align: "right" });
   }
 
-  const filename = `MMPR_Yearly_${data.equipment.code || "equipment"}_${data.range.startYear}-${data.range.endYear}.pdf`;
-  doc.save(filename);
+  return doc;
+}
+
+function makeFilename(data: YearlyMatrixResponse): string {
+  return `MMPR_Yearly_${data.equipment.code || "equipment"}_${data.range.startYear}-${data.range.endYear}.pdf`;
+}
+
+export function downloadYearlyMmprPdf(data: YearlyMatrixResponse): void {
+  const doc = buildYearlyMmprDoc(data);
+  doc.save(makeFilename(data));
+}
+
+/** Build a blob URL for the MMPR PDF — caller is responsible for window navigation. */
+export function buildYearlyMmprBlobUrl(data: YearlyMatrixResponse): string {
+  const doc = buildYearlyMmprDoc(data);
+  return String(doc.output("bloburl"));
+}
+
+/**
+ * Open the MMPR PDF in a new browser tab (read-only view, never download).
+ *
+ * IMPORTANT: This calls `window.open` AFTER awaiting data, so it can be
+ * blocked by the browser's pop-up policy. Prefer the click-handler pattern:
+ *   const win = window.open("about:blank", "_blank");      // sync, with user gesture
+ *   const data = await fetchData();
+ *   win.location.href = buildYearlyMmprBlobUrl(data);
+ */
+export function openYearlyMmprPdf(data: YearlyMatrixResponse): void {
+  const blobUrl = buildYearlyMmprBlobUrl(data);
+  const win = window.open(blobUrl, "_blank", "noopener,noreferrer");
+  if (!win) {
+    alert("Pop-up blocked. Please allow pop-ups for this site to view the MMPR PDF in a new tab.");
+  }
 }

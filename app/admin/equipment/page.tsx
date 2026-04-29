@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { downloadYearlyMmprPdf, type YearlyMatrixResponse } from "../../../lib/pdf/yearlyMmpr";
+import { downloadYearlyMmprPdf, buildYearlyMmprBlobUrl, type YearlyMatrixResponse } from "../../../lib/pdf/yearlyMmpr";
 import { useAdminSession } from "../../../lib/admin-session-context";
 import AddHistoryModal from "../../../components/AddHistoryModal";
 
@@ -128,32 +128,62 @@ export default function EquipmentPage() {
   }
 
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+
+  async function fetchMatrix(row: Row): Promise<YearlyMatrixResponse | null> {
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 1;
+    const startYear = endYear - 1;
+    const startMonth = 1;
+    const params = new URLSearchParams({
+      startYear: String(startYear),
+      startMonth: String(startMonth),
+      endYear: String(endYear),
+      endMonth: String(endMonth),
+    });
+    const res = await fetch(`${API_BASE}/mmpr/yearly-matrix/${row.equipment_id}?${params}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) { alert("Failed to fetch MMPR data"); return null; }
+    return (await res.json()) as YearlyMatrixResponse;
+  }
+
   async function handleGenerateMmpr(row: Row) {
     if (generatingId) return;
     setGeneratingId(row.equipment_id);
     try {
-      const now = new Date();
-      const endYear = now.getFullYear();
-      const endMonth = now.getMonth() + 1;
-      const startYear = endYear - 1;
-      const startMonth = 1;
-      const params = new URLSearchParams({
-        startYear: String(startYear),
-        startMonth: String(startMonth),
-        endYear: String(endYear),
-        endMonth: String(endMonth),
-      });
-      const res = await fetch(`${API_BASE}/mmpr/yearly-matrix/${row.equipment_id}?${params}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) { alert("Failed to fetch MMPR data"); return; }
-      const data = (await res.json()) as YearlyMatrixResponse;
-      downloadYearlyMmprPdf(data);
+      const data = await fetchMatrix(row);
+      if (data) downloadYearlyMmprPdf(data);
     } catch (e) {
       console.error(e);
       alert("Failed to generate MMPR PDF");
     } finally {
       setGeneratingId(null);
+    }
+  }
+
+  async function handleViewMmpr(row: Row) {
+    if (viewingId) return;
+    // Open the new tab SYNCHRONOUSLY in the click handler so the browser doesn't block it.
+    const win = window.open("about:blank", "_blank");
+    if (!win) {
+      alert("Pop-up blocked. Please allow pop-ups for this site to view the MMPR PDF in a new tab.");
+      return;
+    }
+    win.document.write(`<!doctype html><html><head><title>Loading MMPR...</title></head><body style="font-family:system-ui;padding:24px;color:#475569">Loading Yearly MMPR for ${row.equipment_code}...</body></html>`);
+
+    setViewingId(row.equipment_id);
+    try {
+      const data = await fetchMatrix(row);
+      if (!data) { win.close(); return; }
+      win.location.href = buildYearlyMmprBlobUrl(data);
+    } catch (e) {
+      console.error(e);
+      win.close();
+      alert("Failed to open MMPR PDF");
+    } finally {
+      setViewingId(null);
     }
   }
 
@@ -216,6 +246,7 @@ export default function EquipmentPage() {
                   </th>
                 ))}
                 <th className="text-center text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 whitespace-nowrap">History</th>
+                <th className="text-center text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 whitespace-nowrap">View</th>
                 <th className="text-center text-[11px] font-bold uppercase tracking-wider text-white px-4 py-3 whitespace-nowrap">MMPR</th>
               </tr>
             </thead>
@@ -223,7 +254,7 @@ export default function EquipmentPage() {
               {loading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    {Array.from({ length: COLUMNS.length + 2 }).map((_, j) => (
+                    {Array.from({ length: COLUMNS.length + 3 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 rounded bg-gray-100" style={{ width: `${50 + j * 8}%`, animation: "shimmer 1.4s infinite linear", background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "400px 100%" }} />
                       </td>
@@ -232,7 +263,7 @@ export default function EquipmentPage() {
                 ))
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLUMNS.length + 2} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
+                  <td colSpan={COLUMNS.length + 3} className="px-4 py-10 text-center text-gray-400 text-sm">No equipment with maintenance records</td>
                 </tr>
               ) : (
                 rows.map((row) => (
@@ -263,6 +294,17 @@ export default function EquipmentPage() {
                           <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                         </svg>
                         Add
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleViewMmpr(row)}
+                        disabled={viewingId === row.equipment_id}
+                        title="Open Yearly MMPR PDF in a new tab"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 7c1.5-3 3.5-4.5 6-4.5S11.5 4 13 7c-1.5 3-3.5 4.5-6 4.5S2.5 10 1 7z" stroke="currentColor" strokeWidth="1.4"/><circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.4"/></svg>
+                        {viewingId === row.equipment_id ? "..." : "View"}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-center">
