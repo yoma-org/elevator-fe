@@ -75,13 +75,13 @@ export default function AddHistoryModal({ row, onClose, onSaved, token }: Props)
       .catch(() => {});
   }, [row.equipment_type, row.equipment_id, token]);
 
+  // Single-select: clicking the active status clears it; clicking a different status replaces.
   function toggleStatus(ci: number, ii: number, status: string) {
     const key = `${ci}-${ii}`;
     setStatusMap((p) => {
       const current = p[key] ?? [];
-      const next = current.includes(status)
-        ? current.filter((s) => s !== status)
-        : [...current, status];
+      const isActive = current.length === 1 && current[0] === status;
+      const next = isActive ? [] : [status];
       return { ...p, [key]: next };
     });
   }
@@ -120,8 +120,12 @@ export default function AddHistoryModal({ row, onClose, onSaved, token }: Props)
       }
     }
 
-    if (items.length === 0) {
-      setError("Please assign a status (Good / Adjusted / Repair / N/A) to at least one checklist item.");
+    if (totalItems === 0) {
+      setError("No checklist template available for this equipment type.");
+      return;
+    }
+    if (items.length < totalItems) {
+      setError(`Please assign a status to all ${totalItems} checklist items (${items.length}/${totalItems} assessed).`);
       return;
     }
 
@@ -302,13 +306,15 @@ export default function AddHistoryModal({ row, onClose, onSaved, token }: Props)
           <button
             type="button"
             onClick={(e) => handleSave(e as any)}
-            disabled={submitting || loadingChecklist || checkedCount === 0 || takenDates.has(completionDate)}
+            disabled={submitting || loadingChecklist || checkedCount < totalItems || totalItems === 0 || takenDates.has(completionDate)}
             title={
               takenDates.has(completionDate)
                 ? "A record already exists on this date"
-                : checkedCount === 0
-                  ? "Assign a status to at least one checklist item to enable Save"
-                  : ""
+                : totalItems === 0
+                  ? "No checklist template available"
+                  : checkedCount < totalItems
+                    ? `Assign a status to all ${totalItems} items (${checkedCount}/${totalItems} done)`
+                    : ""
             }
             className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-green-700 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
           >

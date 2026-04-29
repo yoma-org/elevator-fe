@@ -381,7 +381,11 @@ export default function Home() {
     }
 
     if (currentStep === 2) {
-      if (checkedCount < 1) errors.checklist = "Please set status for at least one checklist item";
+      if (totalCount === 0) {
+        errors.checklist = "Checklist is empty";
+      } else if (checkedCount < totalCount) {
+        errors.checklist = `Please set a status for all ${totalCount} checklist items (${checkedCount}/${totalCount} assessed)`;
+      }
     }
 
     if (currentStep === 6) {
@@ -442,12 +446,12 @@ export default function Home() {
     na:       { label: "N/A",              color: "#475569", bg: "#f1f5f9", border: "#94a3b8" },
   };
 
+  // Single-select: clicking the active status clears it; clicking a different status replaces.
   const setChecklistStatus = (key: string, status: string) => {
     setFormData((prev) => {
       const current = prev.checklistState[key] ?? [];
-      const updated = current.includes(status)
-        ? current.filter((s) => s !== status)
-        : [...current, status];
+      const isActive = current.length === 1 && current[0] === status;
+      const updated = isActive ? [] : [status];
       return {
         ...prev,
         checklistState: {
