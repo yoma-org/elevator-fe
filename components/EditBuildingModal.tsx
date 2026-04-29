@@ -32,6 +32,8 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
   const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   // Track typeId changes by equipment id
   const [typeChanges, setTypeChanges] = useState<Record<string, string>>({});
+  // Track pending equipment deletions (by equipment id)
+  const [pendingDeletes, setPendingDeletes] = useState<Record<string, true>>({});
   const [knownTypes, setKnownTypes] = useState<EquipmentTypeOption[]>([]);
   // New equipment to add: { rowId, code, equipmentTypeId }
   const [newEquipments, setNewEquipments] = useState<Array<{ rowId: string; code: string; equipmentTypeId: string }>>([]);
@@ -95,6 +97,15 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
     setNewEquipments((p) => p.filter((r) => r.rowId !== rowId));
   }
 
+  function togglePendingDelete(eqId: string) {
+    setPendingDeletes((p) => {
+      const next = { ...p };
+      if (next[eqId]) delete next[eqId];
+      else next[eqId] = true;
+      return next;
+    });
+  }
+
   function setEquipmentType(eqId: string, typeId: string) {
     setTypeChanges((p) => {
       const next = { ...p };
@@ -134,8 +145,9 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
         return;
       }
 
-      // 2. Update each changed equipment type
+      // 2. Update each changed equipment type (skip rows that will be deleted)
       for (const [eqId, typeId] of typeChangesArr) {
+        if (pendingDeletes[eqId]) continue;
         const r = await fetch(`${API_BASE}/equipment/${eqId}/type`, {
           method: "PATCH",
           headers: {
@@ -149,6 +161,22 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
           setError(`Equipment type update failed: ${err.message ?? r.status}`);
           return;
         }
+      }
+
+      // 2b. Delete pending equipment
+      const deleteIds = Object.keys(pendingDeletes);
+      let deletedCount = 0;
+      for (const eqId of deleteIds) {
+        const r = await fetch(`${API_BASE}/equipment/${eqId}`, {
+          method: "DELETE",
+          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          setError(`Failed to delete equipment: ${err.message ?? r.status}`);
+          return;
+        }
+        deletedCount += 1;
       }
 
       // 3. Add any new equipments (only complete rows)
@@ -176,9 +204,11 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
         skippedCount = data.skipped ?? 0;
       }
 
+      const effectiveTypeChanges = typeChangesArr.filter(([id]) => !pendingDeletes[id]).length;
       onSaved(
         `Saved "${name.trim()}"` +
-        (typeChangesArr.length > 0 ? ` + ${typeChangesArr.length} type change(s)` : "") +
+        (effectiveTypeChanges > 0 ? ` + ${effectiveTypeChanges} type change(s)` : "") +
+        (deletedCount > 0 ? ` + ${deletedCount} deleted` : "") +
         (addedCount > 0 ? ` + ${addedCount} new equipment` : "") +
         (skippedCount > 0 ? ` (${skippedCount} duplicate skipped)` : "") +
         (buildingChanged ? "" : ""),
@@ -273,21 +303,26 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
                         <tr className="bg-gray-50">
                           <th className="text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Lift No.</th>
                           <th className="text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Equipment Type</th>
+                          <th className="w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {equipmentList.map((eq) => {
                           const currentTypeId = typeChanges[eq.id] ?? eq.equipment_type_id ?? "";
                           const isChanged = !!typeChanges[eq.id];
+                          const isPendingDelete = !!pendingDeletes[eq.id];
                           return (
-                            <tr key={eq.id} className="border-t border-gray-100">
-                              <td className="px-3 py-2 font-mono text-gray-700">{eq.equipment_code}</td>
+                            <tr key={eq.id} className={`border-t border-gray-100 ${isPendingDelete ? "bg-red-50/60" : ""}`}>
+                              <td className={`px-3 py-2 font-mono ${isPendingDelete ? "text-red-700 line-through" : "text-gray-700"}`}>
+                                {eq.equipment_code}
+                              </td>
                               <td className="px-3 py-2">
                                 <select
                                   value={currentTypeId}
                                   onChange={(e) => setEquipmentType(eq.id, e.target.value)}
-                                  className={`w-full h-8 rounded-md border px-2 text-xs outline-none focus:ring-2 focus:ring-green-100 ${
-                                    isChanged ? "border-amber-400 bg-amber-50" : "border-gray-300 bg-white focus:border-green-600"
+                                  disabled={isPendingDelete}
+                                  className={`w-full h-8 rounded-md border px-2 text-xs outline-none focus:ring-2 focus:ring-green-100 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    isChanged && !isPendingDelete ? "border-amber-400 bg-amber-50" : "border-gray-300 bg-white focus:border-green-600"
                                   }`}
                                 >
                                   {!currentTypeId && <option value="">(unspecified)</option>}
@@ -295,6 +330,29 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
                                     <option key={t.id} value={t.id}>{t.name}</option>
                                   ))}
                                 </select>
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                {isPendingDelete ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePendingDelete(eq.id)}
+                                    className="text-[10px] font-semibold text-red-700 hover:text-red-900 px-1.5 py-0.5 rounded hover:bg-red-100"
+                                    title="Undo delete"
+                                  >
+                                    Undo
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePendingDelete(eq.id)}
+                                    className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                    title="Remove this equipment"
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                                      <path d="M2.5 4h9M5.5 4V2.5h3V4M3.5 4l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8M5.75 6.5v4.5M8.25 6.5v4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           );
@@ -306,6 +364,11 @@ export default function EditBuildingModal({ buildingId, knownTeams, onClose, onS
                 {Object.keys(typeChanges).length > 0 && (
                   <p className="text-[11px] text-amber-700 mt-1.5">
                     {Object.keys(typeChanges).length} equipment type change(s) pending
+                  </p>
+                )}
+                {Object.keys(pendingDeletes).length > 0 && (
+                  <p className="text-[11px] text-red-700 mt-1.5">
+                    {Object.keys(pendingDeletes).length} equipment will be deleted on Save
                   </p>
                 )}
               </div>
