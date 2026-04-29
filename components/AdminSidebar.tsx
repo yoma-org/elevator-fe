@@ -21,6 +21,12 @@ const NAV_ITEMS = [
     section: "Reports",
     items: [
       {
+        label: "Buildings",
+        href: "/admin/buildings",
+        desc: "Manage buildings, teams, equipment",
+        icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 18V6l7-4 7 4v12M7 18v-5h6v5M9 8h.01M11 8h.01M9 11h.01M11 11h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+      },
+      {
         label: "Equipment",
         href: "/admin/equipment",
         desc: "Equipment maintenance overview",
