@@ -1366,6 +1366,26 @@ export default function Home() {
                   <div><span className="text-slate-400 text-xs block">Arrival Time</span><span className="font-medium text-slate-800">{arrivalTime || "-"}</span></div>
                   <div><span className="text-slate-400 text-xs block">Technician</span><span className="font-medium text-slate-800">{formData.technician_name || "-"}</span></div>
                 </dl>
+                {(() => {
+                  const t = (formData.equipment_type ?? "").trim().toLowerCase();
+                  const diagram =
+                    t === "elevator" ? { src: "/diagrams/elevator-form-1.1.png", alt: "Elevator components — Form 1.1", label: "Form 1.1 — Elevator components" } :
+                    t === "escalator" ? { src: "/diagrams/escalator-form-1.3.png", alt: "Escalator components — Form 1.3", label: "Form 1.3 — Escalator components" } :
+                    null;
+                  if (!diagram) return null;
+                  return (
+                    <figure className="mt-3 border border-slate-200 rounded-lg bg-slate-50 p-2">
+                      <img
+                        src={diagram.src}
+                        alt={diagram.alt}
+                        className="block mx-auto max-h-[480px] w-auto object-contain"
+                      />
+                      <figcaption className="mt-1.5 text-center text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                        {diagram.label}
+                      </figcaption>
+                    </figure>
+                  );
+                })()}
               </section>
 
               {/* Step 2: Checklist Results */}
